@@ -1,0 +1,10 @@
+{
+  "name": "@orbitscar/content",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module"
+  ,"exports": {
+    ".": "./src/index.ts",
+    "./data/orbitscar-v0/balance.json": "./data/orbitscar-v0/balance.json"
+  }
+}

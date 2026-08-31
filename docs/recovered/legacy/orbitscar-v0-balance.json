@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "contentSet": "orbitscar-v0",
+  "rulesetVersion": "0.1.0",
+  "resources": {
+    "alloy": { "storageBase": 1200, "dailyTarget": 600 },
+    "volatile": { "storageBase": 900, "dailyTarget": 450 },
+    "signal": { "storageBase": 600, "dailyTarget": 260 }
+  },
+  "buildings": {
+    "command_relay": { "footprint": [3, 3], "hp": 1200, "targetTags": ["core"] },
+    "matter_extractor": { "footprint": [2, 2], "hp": 420, "targetTags": ["economy", "resource"] },
+    "drop_cradle": { "footprint": [2, 2], "hp": 520, "targetTags": ["utility", "deployment"] },
+    "arc_projector": { "footprint": [2, 2], "hp": 480, "targetTags": ["defense", "anti_armor"] },
+    "scatter_coil": { "footprint": [1, 1], "hp": 260, "targetTags": ["defense", "anti_swarm"] },
+    "snare_lattice": { "footprint": [2, 1], "hp": 300, "targetTags": ["defense", "control"] }
+  },
+  "units": {
+    "line_rigger": { "role": "screen", "capacity": 1, "targetPriority": ["defense", "any"], "counters": ["scatter_coil"] },
+    "pulse_marksman": { "role": "ranged_utility", "capacity": 1, "targetPriority": ["utility", "any"], "counters": ["arc_projector"] },
+    "breach_medic": { "role": "support", "capacity": 2, "targetPriority": ["low_health", "any"], "counters": ["phase_jammer"] },
+    "signal_saboteur": { "role": "disable", "capacity": 2, "targetPriority": ["defense", "utility"], "counters": ["interceptor_nest"] },
+    "ram_walker": { "role": "anti_structure", "capacity": 4, "targetPriority": ["defense", "core"], "counters": ["snare_lattice"] },
+    "skirmish_walker": { "role": "flank", "capacity": 3, "targetPriority": ["utility", "any"], "counters": ["arc_projector"] },
+    "shield_carrier": { "role": "cover", "capacity": 3, "targetPriority": ["nearest_defense"], "counters": ["phase_jammer"] },
+    "salvage_hauler": { "role": "extract", "capacity": 2, "targetPriority": ["depot", "resource"], "counters": ["any_defense"] },
+    "needle_drone": { "role": "air_harass", "capacity": 1, "targetPriority": ["air", "utility"], "counters": ["interceptor_nest"] },
+    "relay_drone": { "role": "reinforcement_anchor", "capacity": 2, "targetPriority": ["utility", "any"], "counters": ["interceptor_nest"] }
+  },
+  "commanders": {
+    "mara_voss": { "ability": "emergency_reroute", "charges": 1 },
+    "ion_kade": { "ability": "overwatch_ping", "charges": 1 }
+  }
+}
