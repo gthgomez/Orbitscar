@@ -1,6 +1,6 @@
 # Project Orbitscar — Vertical Slice
 
-**Status:** ACCEPTANCE CONTRACT V0.1
+**Status:** LOCAL PLAYABLE SLICE V0.2 — automated acceptance in place; human blind-test gates remain open.
 
 ## Slice question
 
@@ -9,16 +9,16 @@ Is constructing a small base and directly attacking one base fun, legible, and r
 ## Included
 
 - One colony plinth with snap-grid placement.
-- Four buildings: command relay, matter extractor, drop cradle, one selected defense.
+- Six buildings: command relay, matter extractor, drop cradle, and three defense modules.
 - Three defense archetypes: arc projector, scatter coil, snare lattice.
-- Four units: line rigger, pulse marksman, ram walker, needle drone.
+- Ten content-defined units, exposed through the training bay and persistent reserve list.
 - One commander: Mara Voss with Emergency Reroute.
 - Three resources with stub faucets/sinks.
-- One authored NPC base with two viable attack plans.
+- Three authored NPC bases with distinct layouts, rewards, and difficulty bands.
 - Scout snapshot with confidence/staleness.
-- Three deployment charges and one reinforcement action.
+- Three deployment charges with interactive multi-wave reinforcement timing.
 - One ability, win/partial/retreat/loss states.
-- Deterministic battle seed, event stream, result hash, and read-only replay.
+- Deterministic battle seed, event stream, result hash, read-only replay, and idempotent report reconciliation.
 - Post-battle report with losses, structures, plan summary, and next-action hint.
 
 ## Acceptance criteria

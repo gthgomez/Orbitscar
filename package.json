@@ -7,9 +7,12 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:web": "tsc -p apps/web/tsconfig.json --noEmit",
     "test": "vitest run",
     "simulate": "tsx packages/simulation/src/cli.ts",
-    "validate:content": "tsx packages/content/src/validate.ts"
+    "validate:content": "tsx packages/content/src/validate.ts",
+    "build:web": "pnpm --filter @orbitscar/web build",
+    "check": "pnpm typecheck && pnpm typecheck:web && pnpm validate:content && pnpm test && pnpm build:web"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

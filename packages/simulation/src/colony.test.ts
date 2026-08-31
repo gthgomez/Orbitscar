@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, createColony, parseColonySave, placeColonyBuilding, serializeColony, trainUnits } from "./colony.js";
+import { applyBattleResult, advanceColony, createColony, parseColonySave, placeColonyBuilding, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
@@ -26,6 +26,14 @@ describe("Orbitscar persistent colony loop", () => {
     expect(() => trainUnits({ ...trained, resources: { alloy: 0, volatile: 0, signal: 0 } }, "ram_walker", 1, content)).toThrow("insufficient");
   });
 
+  it("upgrades an installed module with scaled cost and integrity", () => {
+    const initial = createColony("test-player", content);
+    const upgraded = upgradeColonyBuilding(initial, "matter-extractor-1", content);
+    expect(upgraded.buildings.find((building) => building.id === "matter-extractor-1")?.level).toBe(2);
+    expect(upgraded.buildings.find((building) => building.id === "matter-extractor-1")?.health).toBe(119);
+    expect(upgraded.resources.alloy).toBeLessThan(initial.resources.alloy);
+  });
+
   it("round-trips tamper-detected saves and reconciles casualties, survivors, loot, and reports", () => {
     const initial = trainUnits(createColony("test-player", content), "line_rigger", 3, content);
     const input = parseOrbitscarBattleScenario(fixture, content);
@@ -39,5 +47,6 @@ describe("Orbitscar persistent colony loop", () => {
     expect(parseColonySave(serialized)).toEqual(after);
     const tampered = serialized.replace('"playerId":"test-player"', '"playerId":"intruder"');
     expect(() => parseColonySave(tampered)).toThrow("checksum mismatch");
+    expect(applyBattleResult(after, battleInput, result)).toEqual(after);
   });
 });

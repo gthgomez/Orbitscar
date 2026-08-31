@@ -38,5 +38,56 @@
   "commanders": {
     "mara_voss": { "abilityId": "emergency_reroute", "charges": 1 },
     "ion_kade": { "abilityId": "emergency_reroute", "charges": 1 }
+  },
+  "encounters": {
+    "cinder-yard": {
+      "name": "Cinder Yard Relay",
+      "codename": "CINDER-07",
+      "difficulty": "cautious",
+      "description": "A lightly defended salvage relay with a generous exposed extractor. A clean first breach for testing approach angles.",
+      "rewardPreview": { "alloy": 36, "volatile": 14, "signal": 6 },
+      "suggestedCounters": ["line_rigger", "pulse_marksman", "ram_walker"],
+      "structures": [
+        { "id": "relay", "buildingId": "command_relay", "position": { "x": 930, "y": 400 } },
+        { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 240 } },
+        { "id": "cradle", "buildingId": "drop_cradle", "position": { "x": 760, "y": 560 } },
+        { "id": "arc", "buildingId": "arc_projector", "position": { "x": 640, "y": 300 } },
+        { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 690, "y": 520 } },
+        { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 830, "y": 400 } }
+      ]
+    },
+    "glass-spine": {
+      "name": "Glass Spine Foundry",
+      "codename": "GLASS-22",
+      "difficulty": "contested",
+      "description": "A compact foundry ring with overlapping fire lanes. The north approach is shorter; the south route gives ranged units more breathing room.",
+      "rewardPreview": { "alloy": 54, "volatile": 20, "signal": 10 },
+      "suggestedCounters": ["pulse_marksman", "signal_saboteur", "needle_drone"],
+      "structures": [
+        { "id": "relay", "buildingId": "command_relay", "position": { "x": 920, "y": 400 } },
+        { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 205 } },
+        { "id": "extractor-2", "buildingId": "matter_extractor", "position": { "x": 760, "y": 595 } },
+        { "id": "arc", "buildingId": "arc_projector", "position": { "x": 620, "y": 280 } },
+        { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 710, "y": 470 } },
+        { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 825, "y": 400 } }
+      ]
+    },
+    "quiet-orbit": {
+      "name": "Quiet Orbit Depot",
+      "codename": "QUIET-31",
+      "difficulty": "severe",
+      "description": "A mature depot protected by a layered defense mesh. It pays well, but careless mass deployment feeds the scatter coil.",
+      "rewardPreview": { "alloy": 72, "volatile": 28, "signal": 15 },
+      "suggestedCounters": ["shield_carrier", "breach_medic", "ram_walker"],
+      "structures": [
+        { "id": "relay", "buildingId": "command_relay", "position": { "x": 930, "y": 400 } },
+        { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 210 } },
+        { "id": "extractor-2", "buildingId": "matter_extractor", "position": { "x": 760, "y": 590 } },
+        { "id": "cradle", "buildingId": "drop_cradle", "position": { "x": 790, "y": 400 } },
+        { "id": "arc", "buildingId": "arc_projector", "position": { "x": 610, "y": 260 } },
+        { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 675, "y": 500 } },
+        { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 835, "y": 400 } }
+      ]
+    }
   }
 }
