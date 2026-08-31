@@ -41,3 +41,20 @@
 - **Why:** makes geography legible and reversible while limiting map drift.
 - **Downside:** 96 nodes may be too small/large for a real population.
 - **Reconsider when:** 3–6 alliance map test produces concentration or insufficient fronts.
+## D-005 — single Orbitscar combat contract
+
+- Question: How should content and simulation share targeting, deployment, and replay semantics?
+- Alternatives: retain legacy string priorities; embed balance in the resolver; use a shared runtime-validated content schema and explicit command stream.
+- Evidence: legacy content contained incompatible terms and the previous resolver reused stack quantities. The hardened tests reject unknown selectors, fractional counts, reuse, duplicate commands, and out-of-window ticks.
+- Choice: use `packages/content/src/schema.ts`, content-backed identifiers, explicit quantities, canonical `tick -> sequence -> commandId` ordering, and a versioned SHA-256 digest.
+- Downside: the prototype cannot consume old fixture shapes without migration, and the simulation package now has one small workspace dependency on content types.
+- Reconsider when: the battle rules stop being pure or a second independent game proves it needs the same schema.
+
+## D-006 — Phaser for first visual combat client
+
+- Question: Which client technology should test spatial battle agency?
+- Alternatives: Godot, React UI renderer, custom Canvas/WebGL client, Phaser 3.
+- Evidence: Phaser provides a focused WebGL/Canvas game loop and TypeScript browser path; Godot web export remains viable but has web/mobile constraints; React is not a real-time renderer. See [architecture-decision-record.md](../architecture/architecture-decision-record.md).
+- Choice: Phaser 3 + TypeScript + Vite for this prototype, with simulation kept renderer-independent.
+- Downside: Android packaging and WebView behavior remain unverified, and the bundle is currently over Vite's 500 kB warning threshold.
+- Reconsider when: the battle slice fails on low-end Android or Phaser cannot sustain the measured entity/event budget.

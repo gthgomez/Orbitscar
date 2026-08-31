@@ -6,3 +6,7 @@ coverage/
 .env.*
 !.env.example
 *.tsbuildinfo
+*-recovery-and-foundation-*.zip
+*-recovery-and-foundation-*.sha256
+*-combat-foundation-*.zip
+*-combat-foundation-*.sha256
