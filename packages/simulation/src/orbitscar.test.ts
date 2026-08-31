@@ -100,6 +100,6 @@ describe("Orbitscar deterministic spatial combat", () => {
     const badContent = JSON.parse(JSON.stringify(content));
     badContent.units.line_rigger.targetPriority = [{ selector: "tag", tag: "legacy_target" }];
     expect(() => parseOrbitscarContent(badContent)).toThrow("unknown target tag");
-    expect(() => resolveOrbitscarBattle({ ...parseOrbitscarBattleScenario(bad, content), rulesetVersion: "tideforge-1" })).toThrow("rulesetVersion must match loaded content");
+    expect(() => resolveOrbitscarBattle({ ...parseOrbitscarBattleScenario(bad, content), rulesetVersion: "other-ruleset-1" })).toThrow("rulesetVersion must match loaded content");
   });
 });
