@@ -2,6 +2,12 @@
 * { box-sizing: border-box; }
 html, body, #game { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #081018; }
 body { touch-action: none; }
+.colony-panel { position: fixed; right: 14px; top: 14px; z-index: 30; width: 230px; padding: 10px; border: 1px solid #27414c; background: rgba(8, 16, 24, .92); box-shadow: 0 8px 24px rgba(0,0,0,.25); font: 11px/1.45 monospace; color: #b8c8cf; }
+#colony-panel { position: fixed; right: 14px; top: 14px; z-index: 30; width: 230px; padding: 10px; border: 1px solid #27414c; background: rgba(8, 16, 24, .92); box-shadow: 0 8px 24px rgba(0,0,0,.25); font: 11px/1.45 monospace; color: #b8c8cf; }
+.colony-heading { color: #8ee6d1; letter-spacing: .08em; margin-bottom: 6px; }
+.colony-actions { display: flex; gap: 6px; margin-top: 8px; }
+.colony-actions button { min-height: 30px; padding: 4px 7px; font: inherit; }
+.colony-message { min-height: 16px; margin-top: 6px; color: #f2c879; }
 .lab-shell { position: fixed; inset: 0; display: flex; flex-direction: column; pointer-events: none; }
 .topbar, .bottombar { pointer-events: auto; background: rgba(8, 16, 24, .92); border: 1px solid #27414c; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
 .topbar { display: flex; align-items: center; gap: 18px; min-height: 52px; padding: 8px 14px; }
@@ -18,3 +24,4 @@ button:hover, button:focus-visible { background: #22515a; outline: 2px solid #8e
 button:disabled { cursor: not-allowed; opacity: .45; }
 .hint { font-size: 11px; color: #8197a1; }
 @media (max-width: 760px) { .topbar { gap: 8px; padding: 6px 8px; } .brand { font-size: 12px; } .metrics { font-size: 10px; } .bottombar { grid-template-columns: 1fr; max-height: 42vh; overflow: auto; } }
+@media (max-width: 760px) { #colony-panel { right: 8px; top: 8px; width: 190px; } }

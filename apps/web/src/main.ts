@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent } from "@orbitscar/content";
 import { resolveOrbitscarBattle, type OrbitscarBattleEvent, type OrbitscarBattleInput, type OrbitscarBattleResult, type OrbitscarCommand, type OrbitscarPosition } from "@orbitscar/simulation";
+import { createColony, parseColonySave, serializeColony, trainUnits, type ColonyState } from "@orbitscar/simulation";
 import "./style.css";
 
 const content = parseOrbitscarContent(balance);
@@ -19,6 +20,12 @@ const structures = [
   { id: "snare", buildingId: "snare_lattice", position: { x: 830, y: 400 } },
 ];
 const army = [{ unitId: "line_rigger", count: 3 }, { unitId: "pulse_marksman", count: 2 }, { unitId: "ram_walker", count: 2 }, { unitId: "needle_drone", count: 1 }];
+
+const colonyStorageKey = "orbitscar_colony_v1";
+let colony: ColonyState;
+try { const saved = window.localStorage.getItem(colonyStorageKey); colony = saved === null ? createColony("local-player", content) : parseColonySave(saved); } catch { colony = createColony("local-player", content); }
+function renderColony(message = ""): void { const resources = document.querySelector<HTMLDivElement>("#colony-resources"); const reserves = document.querySelector<HTMLDivElement>("#colony-reserves"); const status = document.querySelector<HTMLDivElement>("#colony-message"); if (resources) resources.textContent = `RESOURCES  alloy ${Math.floor(colony.resources.alloy ?? 0)}  volatile ${Math.floor(colony.resources.volatile ?? 0)}  signal ${Math.floor(colony.resources.signal ?? 0)}`; if (reserves) reserves.textContent = `RESERVES  ${Object.entries(colony.reserves).filter(([, count]) => count > 0).map(([id, count]) => `${id}:${count}`).join("  ") || "empty"}  • reports ${colony.reports.length}`; if (status) status.textContent = message; }
+function saveColony(): void { try { window.localStorage.setItem(colonyStorageKey, serializeColony(colony)); renderColony("saved locally"); } catch { renderColony("local save unavailable"); } }
 
 function deployment(commandId: string, sequence: number, tick: number, zone: Zone, units: { unitId: string; count: number }[]): OrbitscarCommand {
   return { commandId, sequence, tick, type: "DEPLOY", payload: { zone, position: { ...zonePosition[zone] }, units } };
@@ -63,6 +70,9 @@ class BreachScene extends Phaser.Scene {
   constructor() { super("BreachScene"); }
 
   create(): void {
+    renderColony("new colony ready");
+    document.querySelector<HTMLButtonElement>("#train-line")?.addEventListener("click", () => { try { colony = trainUnits(colony, "line_rigger", 1, content); renderColony("line rigger added to reserves"); } catch (error) { renderColony(error instanceof Error ? error.message : "training failed"); } });
+    document.querySelector<HTMLButtonElement>("#save-colony")?.addEventListener("click", saveColony);
     this.cameras.main.setBounds(0, 0, ARENA.width, ARENA.height);
     this.cameras.main.setZoom(Math.min(this.scale.width / 1280, this.scale.height / 860));
     this.world = this.add.graphics();

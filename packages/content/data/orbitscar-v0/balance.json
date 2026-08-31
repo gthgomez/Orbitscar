@@ -8,12 +8,12 @@
     "signal": { "kind": "normal" }
   },
   "buildings": {
-    "command_relay": { "footprint": [3, 3], "maxHealth": 220, "targetTags": ["core"] },
-    "matter_extractor": { "footprint": [2, 2], "maxHealth": 95, "targetTags": ["economy", "resource"] },
-    "drop_cradle": { "footprint": [2, 2], "maxHealth": 110, "targetTags": ["utility", "deployment"] },
-    "arc_projector": { "footprint": [2, 2], "maxHealth": 70, "targetTags": ["defense", "anti_armor"], "defenseId": "arc_projector" },
-    "scatter_coil": { "footprint": [1, 1], "maxHealth": 52, "targetTags": ["defense", "anti_swarm"], "defenseId": "scatter_coil" },
-    "snare_lattice": { "footprint": [2, 1], "maxHealth": 58, "targetTags": ["defense", "control"], "defenseId": "snare_lattice" }
+    "command_relay": { "footprint": [3, 3], "maxHealth": 220, "targetTags": ["core"], "cost": { "alloy": 120, "volatile": 40, "signal": 20 } },
+    "matter_extractor": { "footprint": [2, 2], "maxHealth": 95, "targetTags": ["economy", "resource"], "cost": { "alloy": 50, "volatile": 10, "signal": 5 } },
+    "drop_cradle": { "footprint": [2, 2], "maxHealth": 110, "targetTags": ["utility", "deployment"], "cost": { "alloy": 70, "volatile": 20, "signal": 15 } },
+    "arc_projector": { "footprint": [2, 2], "maxHealth": 70, "targetTags": ["defense", "anti_armor"], "defenseId": "arc_projector", "cost": { "alloy": 80, "volatile": 35, "signal": 10 } },
+    "scatter_coil": { "footprint": [1, 1], "maxHealth": 52, "targetTags": ["defense", "anti_swarm"], "defenseId": "scatter_coil", "cost": { "alloy": 45, "volatile": 20, "signal": 8 } },
+    "snare_lattice": { "footprint": [2, 1], "maxHealth": 58, "targetTags": ["defense", "control"], "defenseId": "snare_lattice", "cost": { "alloy": 55, "volatile": 25, "signal": 20 } }
   },
   "defenses": {
     "arc_projector": { "buildingId": "arc_projector", "maxHealth": 70, "range": 260, "damage": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "ground" }, { "selector": "any" }], "targetTags": ["defense", "anti_armor"] },
@@ -21,16 +21,16 @@
     "snare_lattice": { "buildingId": "snare_lattice", "maxHealth": 58, "range": 220, "damage": 2, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "air" }, { "selector": "any" }], "targetTags": ["defense", "control"] }
   },
   "units": {
-    "line_rigger": { "role": "screen", "capacity": 1, "power": 5, "health": 34, "range": 34, "speed": 5, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"] },
-    "pulse_marksman": { "role": "ranged_utility", "capacity": 1, "power": 4, "health": 24, "range": 150, "speed": 3, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"] },
-    "breach_medic": { "role": "support", "capacity": 2, "power": 2, "health": 28, "range": 80, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "lowest_health", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["snare_lattice"] },
-    "signal_saboteur": { "role": "disable", "capacity": 2, "power": 3, "health": 22, "range": 110, "speed": 4, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "utility" }], "targetTags": ["ground"], "counters": ["snare_lattice"] },
-    "ram_walker": { "role": "anti_structure", "capacity": 4, "power": 8, "health": 70, "range": 42, "speed": 2, "cadence": 30, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "core" }], "targetTags": ["ground", "anti_armor"], "counters": ["snare_lattice"] },
-    "skirmish_walker": { "role": "flank", "capacity": 3, "power": 4, "health": 30, "range": 48, "speed": 6, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"] },
-    "shield_carrier": { "role": "cover", "capacity": 3, "power": 2, "health": 90, "range": 34, "speed": 2, "cadence": 30, "targetPriority": [{ "selector": "nearest", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"] },
-    "salvage_hauler": { "role": "extract", "capacity": 2, "power": 2, "health": 42, "range": 60, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "tag", "tag": "resource" }, { "selector": "tag", "tag": "economy" }], "targetTags": ["ground"], "counters": ["arc_projector"] },
-    "needle_drone": { "role": "air_harass", "capacity": 1, "power": 5, "health": 18, "range": 120, "speed": 7, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "air" }, { "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["snare_lattice"] },
-    "relay_drone": { "role": "reinforcement_anchor", "capacity": 2, "power": 3, "health": 26, "range": 90, "speed": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["scatter_coil"] }
+    "line_rigger": { "role": "screen", "capacity": 1, "power": 5, "health": 34, "range": 34, "speed": 5, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"], "cost": { "alloy": 8, "volatile": 2, "signal": 1 } },
+    "pulse_marksman": { "role": "ranged_utility", "capacity": 1, "power": 4, "health": 24, "range": 150, "speed": 3, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 10, "volatile": 3, "signal": 4 } },
+    "breach_medic": { "role": "support", "capacity": 2, "power": 2, "health": 28, "range": 80, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "lowest_health", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["snare_lattice"], "cost": { "alloy": 12, "volatile": 4, "signal": 6 } },
+    "signal_saboteur": { "role": "disable", "capacity": 2, "power": 3, "health": 22, "range": 110, "speed": 4, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "utility" }], "targetTags": ["ground"], "counters": ["snare_lattice"], "cost": { "alloy": 14, "volatile": 5, "signal": 8 } },
+    "ram_walker": { "role": "anti_structure", "capacity": 4, "power": 8, "health": 70, "range": 42, "speed": 2, "cadence": 30, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "core" }], "targetTags": ["ground", "anti_armor"], "counters": ["snare_lattice"], "cost": { "alloy": 24, "volatile": 10, "signal": 3 } },
+    "skirmish_walker": { "role": "flank", "capacity": 3, "power": 4, "health": 30, "range": 48, "speed": 6, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 16, "volatile": 6, "signal": 3 } },
+    "shield_carrier": { "role": "cover", "capacity": 3, "power": 2, "health": 90, "range": 34, "speed": 2, "cadence": 30, "targetPriority": [{ "selector": "nearest", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"], "cost": { "alloy": 20, "volatile": 5, "signal": 2 } },
+    "salvage_hauler": { "role": "extract", "capacity": 2, "power": 2, "health": 42, "range": 60, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "tag", "tag": "resource" }, { "selector": "tag", "tag": "economy" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 13, "volatile": 5, "signal": 4 } },
+    "needle_drone": { "role": "air_harass", "capacity": 1, "power": 5, "health": 18, "range": 120, "speed": 7, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "air" }, { "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["snare_lattice"], "cost": { "alloy": 9, "volatile": 5, "signal": 5 } },
+    "relay_drone": { "role": "reinforcement_anchor", "capacity": 2, "power": 3, "health": 26, "range": 90, "speed": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["scatter_coil"], "cost": { "alloy": 11, "volatile": 4, "signal": 7 } }
   },
   "abilities": {
     "emergency_reroute": { "kind": "reroute", "durationTicks": 180, "magnitude": 2 }

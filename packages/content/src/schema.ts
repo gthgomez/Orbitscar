@@ -32,7 +32,10 @@ export type OrbitscarUnitDefinition = {
   targetPriority: OrbitscarTargetPriority[];
   targetTags: OrbitscarTargetTag[];
   counters: string[];
+  cost: OrbitscarResourceBundle;
 };
+
+export type OrbitscarResourceBundle = Record<string, number>;
 
 export type OrbitscarBuildingDefinition = {
   id: string;
@@ -40,6 +43,7 @@ export type OrbitscarBuildingDefinition = {
   maxHealth: number;
   targetTags: OrbitscarTargetTag[];
   defenseId?: string;
+  cost: OrbitscarResourceBundle;
 };
 
 export type OrbitscarDefenseDefinition = {
@@ -111,6 +115,13 @@ function stringArray(value: unknown, label: string): string[] {
   return value.map((entry, index) => stringValue(entry, `${label}[${index}]`));
 }
 
+function resourceBundle(value: unknown, label: string): OrbitscarResourceBundle {
+  const input = record(value, label);
+  const output: OrbitscarResourceBundle = {};
+  for (const [resourceId, amount] of Object.entries(input)) output[resourceId] = finiteNumber(amount, `${label}.${resourceId}`);
+  return output;
+}
+
 function tags(value: unknown, label: string): OrbitscarTargetTag[] {
   const values = stringArray(value, label);
   return values.map((tag) => {
@@ -171,7 +182,7 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       if (!Array.isArray(footprintValue) || footprintValue.length !== 2) throw new Error(`buildings.${id}.footprint must be [width,height]`);
       const footprint = [integerValue(footprintValue[0], `buildings.${id}.footprint[0]`, 1), integerValue(footprintValue[1], `buildings.${id}.footprint[1]`, 1)] as [number, number];
       const defenseId = item.defenseId === undefined ? undefined : stringValue(item.defenseId, `buildings.${id}.defenseId`);
-      return { id, footprint, maxHealth: finiteNumber(item.maxHealth, `buildings.${id}.maxHealth`, 1), targetTags: tags(item.targetTags, `buildings.${id}.targetTags`), ...(defenseId === undefined ? {} : { defenseId }) };
+      return { id, footprint, maxHealth: finiteNumber(item.maxHealth, `buildings.${id}.maxHealth`, 1), targetTags: tags(item.targetTags, `buildings.${id}.targetTags`), cost: resourceBundle(item.cost, `buildings.${id}.cost`), ...(defenseId === undefined ? {} : { defenseId }) };
     }),
     "buildings",
   );
@@ -189,7 +200,7 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
   const units = uniqueIds(
     Object.entries(rawUnits).map(([id, raw]) => {
       const item = record(raw, `units.${id}`);
-      return { id, role: stringValue(item.role, `units.${id}.role`), capacity: integerValue(item.capacity, `units.${id}.capacity`, 1), power: finiteNumber(item.power, `units.${id}.power`, 1), health: finiteNumber(item.health, `units.${id}.health`, 1), range: finiteNumber(item.range, `units.${id}.range`), speed: finiteNumber(item.speed, `units.${id}.speed`, 1), cadence: integerValue(item.cadence, `units.${id}.cadence`, 1), targetPriority: priorities(item.targetPriority, `units.${id}.targetPriority`), targetTags: tags(item.targetTags, `units.${id}.targetTags`), counters: stringArray(item.counters, `units.${id}.counters`) };
+      return { id, role: stringValue(item.role, `units.${id}.role`), capacity: integerValue(item.capacity, `units.${id}.capacity`, 1), power: finiteNumber(item.power, `units.${id}.power`, 1), health: finiteNumber(item.health, `units.${id}.health`, 1), range: finiteNumber(item.range, `units.${id}.range`), speed: finiteNumber(item.speed, `units.${id}.speed`, 1), cadence: integerValue(item.cadence, `units.${id}.cadence`, 1), targetPriority: priorities(item.targetPriority, `units.${id}.targetPriority`), targetTags: tags(item.targetTags, `units.${id}.targetTags`), counters: stringArray(item.counters, `units.${id}.counters`), cost: resourceBundle(item.cost, `units.${id}.cost`) };
     }),
     "units",
   );

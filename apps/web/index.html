@@ -8,6 +8,16 @@
   </head>
   <body>
     <main id="game"></main>
+    <aside id="colony-panel" aria-label="Colony status">
+      <div class="colony-heading">COLONY // LOCAL AUTHORITY</div>
+      <div id="colony-resources"></div>
+      <div id="colony-reserves"></div>
+      <div class="colony-actions">
+        <button id="train-line" type="button">Train Line Rigger</button>
+        <button id="save-colony" type="button">Save Colony</button>
+      </div>
+      <div id="colony-message" class="colony-message" role="status"></div>
+    </aside>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
