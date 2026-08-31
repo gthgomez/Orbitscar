@@ -77,6 +77,16 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(immediate.commanderUse.count).toBe(1); expect(delayed.commanderUse.count).toBe(1);
   });
 
+  it("makes composition observable against the same base and deployment plan", () => {
+    const armor = resolveOrbitscarBattle(inputWith(baseCommands, { army: [{ unitId: "ram_walker", count: 2 }, { unitId: "line_rigger", count: 2 }] }));
+    const ranged = resolveOrbitscarBattle(inputWith([
+      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "needle_drone", count: 1 }] } },
+      { commandId: "ability", sequence: 2, tick: 120, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "arc" } },
+    ], { army: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "needle_drone", count: 1 }] }));
+    expect(armor.outcomeHash).not.toBe(ranged.outcomeHash);
+    expect(armor.destroyedStructureIds).not.toEqual(ranged.destroyedStructureIds);
+  });
+
   it("records attacker casualties, never negative health/reserves, and stops dead entities", () => {
     const result = resolveOrbitscarBattle(inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "needle_drone", count: 1 }, { unitId: "line_rigger", count: 2 }] } }], { maxDurationTicks: 500 }));
     expect(Object.values(result.attackerCasualties).every((count) => count >= 0)).toBe(true);
