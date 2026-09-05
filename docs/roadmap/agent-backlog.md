@@ -36,7 +36,7 @@ Each task is intentionally small enough for an independent agent and names its n
 |---|---|---|---|---|---|
 | U-001 | Implement semantic UI tokens | `apps/web/src/...` | IA doc | token names used by slice; no visual clone | low / token module |
 | A-001 | Create original debug asset pack | `apps/web/public/art/orbitscar` | art bible | generated/handmade SVG/flat shapes with provenance; no Edgeworld refs | low / provenance pack |
-| T-001 | Add headless balance command | `packages/combat`, scripts | S-002 | 1k seeded runs and JSONL summary; no CI threshold yet | medium / harness |
+| T-001 | ~~Add headless balance command~~ **Done 2026-09-05**: `packages/evaluation` (`pnpm evaluate`) — 1,344-run deterministic corpus, JSONL + summary, invariant checks, baseline committed in `packages/evaluation/baselines/`. Balance-change decisions intentionally deferred to an evidence-first rerun. | `packages/evaluation` | S-002 | findings in `packages/evaluation/FINDINGS.md` | done / harness |
 | T-002 | Add responsive browser smoke | `.github`, web e2e | C-001 | desktop/mobile viewport checks, second attack, console capture; no store test | medium / e2e |
 | I-001 | Make CI run campaign data/schema checks | `.github/workflows/ci.yml` | D-001 | validate JSON; do not alter existing workflow semantics without review | medium / CI patch |
 | I-002 | Verify Android shell option | `docs/architecture/architecture-decision-record.md` | phase 2 | measured Capacitor/Godot spike; no production shell | medium / decision update |

@@ -51,6 +51,15 @@ importers:
 
   packages/content: {}
 
+  packages/evaluation:
+    dependencies:
+      '@orbitscar/content':
+        specifier: workspace:*
+        version: link:../content
+      '@orbitscar/simulation':
+        specifier: workspace:*
+        version: link:../simulation
+
   packages/simulation:
     dependencies:
       '@noble/hashes':
