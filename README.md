@@ -30,4 +30,6 @@ pnpm check
 The browser client is intentionally Phaser-only for tactical rendering; React is not a dependency.
 ```
 
+Human blind-test instrumentation lives in `docs/playtest/` (protocol, observation form, session checklist); the item-10 gate remains BLOCKED_ON_HUMAN_PLAYTEST until five real sessions are recorded.
+
 The project is repo-ready but unpublished. Do not add Tideforge as a workspace, package source, Git submodule, or development dependency.
