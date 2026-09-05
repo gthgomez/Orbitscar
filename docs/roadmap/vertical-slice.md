@@ -32,7 +32,7 @@ Is constructing a small base and directly attacking one base fun, legible, and r
 7. Illegal placement, capacity overflow, duplicate event, and invalid ability are rejected by the local simulation authority adapter. Stale-snapshot rejection is a future remote-server acceptance criterion because this slice has no production server or versioned remote snapshots.
 8. Web keyboard/mouse input is exercised by the automated browser contract suite; touch input follows the same pointer path and still needs a real-device human pass.
 9. Low-effects mode is implemented as a persisted readability toggle: it calms tactical update cadence while preserving target identity, damage/hit meaning, deployment markers, destroyed-state meaning, battle progress, and report meaning.
-10. Five blind testers: ≥60% start a second attack and ≥60% explain one counter.
+10. Five blind testers: ≥60% start a second attack and ≥60% explain one counter. **Instrumentation ready** (`docs/playtest/`); gate is BLOCKED_ON_HUMAN_PLAYTEST.
 
 ## Explicit exclusions
 
