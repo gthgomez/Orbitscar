@@ -54,3 +54,6 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .empty { padding: 16px; border: 1px dashed #31525c; color: #90a8af; text-align: center; }
 .footer-help { color: #748d96; font-size: 11px; }
 @media (max-width: 760px) { .topbar { flex-wrap: wrap; } .metrics { order: 3; width: 100%; margin-left: 0; } .content { max-height: calc(100vh - 110px); } .nav { margin-left: 0; } .content.wide { width: calc(100% - 28px); } .zone-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.readability-toggle { margin-left: 10px; }
+.low-effects .meter i { transition: none; }

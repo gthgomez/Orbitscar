@@ -44,3 +44,7 @@ Desktop/laptop: larger board, optional side-by-side scout/report panels, no extr
 ## V0.3 implementation note
 
 The Phaser scene now supports tap selection, drag pan, wheel zoom, two-pointer pinch zoom, snap-grid placement preview, and deployment-zone selection with three active pointers. The DOM command surface uses keyboard-accessible buttons with visible alternatives. Scrolling and browser certification on representative mobile devices remain verification work, not a completed claim.
+
+## Readability preference
+
+The top bar exposes a single persisted Low Effects toggle (`colony.settings.reducedMotion`). Low effects throttles the tactical battle redraw cadence so motion is calmer, while target identity, damage and hit meaning, deployment markers, destroyed-state rendering, battle progress, and report meaning are all preserved. The simulation authority is unaffected; only presentation cadence changes. OS-level `prefers-reduced-motion` is not yet auto-detected and remains a documented follow-up.

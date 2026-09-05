@@ -5,7 +5,7 @@ import { type GameMode, type ReplayState, type Zone, zonePositions } from "../st
 
 const ARENA = { width: 1200, height: 800 };
 const GRID = 40;
-export type SceneBridge = { content: OrbitscarContent; getMode: () => GameMode; getColony: () => ColonyState; getBuildMode: () => string | undefined; getSelectedBuildingId: () => string | undefined; getSelectedZone: () => Zone; getTargetStructures: () => Array<{ id: string; buildingId: string; position: OrbitscarPosition; currentHealth?: number }>; getReplay: () => ReplayState | undefined; setPreview: (position?: OrbitscarPosition) => void; selectBuilding: (id?: string) => void; selectZone: (zone: Zone) => void; placeBuilding: (position: OrbitscarPosition) => void; onFrame: (now: number) => void };
+export type SceneBridge = { content: OrbitscarContent; getMode: () => GameMode; getColony: () => ColonyState; getBuildMode: () => string | undefined; getSelectedBuildingId: () => string | undefined; getSelectedZone: () => Zone; getTargetStructures: () => Array<{ id: string; buildingId: string; position: OrbitscarPosition; currentHealth?: number }>; getReplay: () => ReplayState | undefined; isReducedMotion: () => boolean; setPreview: (position?: OrbitscarPosition) => void; selectBuilding: (id?: string) => void; selectZone: (zone: Zone) => void; placeBuilding: (position: OrbitscarPosition) => void; onFrame: (now: number) => void };
 
 export class OrbitscarScene extends Phaser.Scene {
   private world!: Phaser.GameObjects.Graphics;
@@ -13,6 +13,7 @@ export class OrbitscarScene extends Phaser.Scene {
   private dragStart?: { x: number; y: number; scrollX: number; scrollY: number };
   private pinchDistance?: number;
   private preview?: OrbitscarPosition;
+  private lastBattleDrawAt = 0;
   private units = new Map<string, { position: OrbitscarPosition; health: number; alive: boolean }>();
   private structureHealth = new Map<string, number>();
   constructor(bridge: SceneBridge) { super("OrbitscarScene"); this.bridge = bridge; }
@@ -28,7 +29,7 @@ export class OrbitscarScene extends Phaser.Scene {
     this.scale.on("resize", () => this.updateCameraZoom());
     this.draw();
   }
-  update(): void { this.bridge.onFrame(performance.now()); this.draw(); }
+  update(): void { this.bridge.onFrame(performance.now()); const now = performance.now(); if (this.bridge.isReducedMotion() && this.bridge.getMode() === "battle" && now - this.lastBattleDrawAt < 400) return; this.lastBattleDrawAt = now; this.draw(); }
   private worldPoint(pointer: Phaser.Input.Pointer): OrbitscarPosition { const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y); return { x: point.x, y: point.y }; }
   private pointerDistance(): number { return Phaser.Math.Distance.Between(this.input.pointer1.x, this.input.pointer1.y, this.input.pointer2.x, this.input.pointer2.y); }
   private updateCameraZoom(): void { if (this.cameras.main) this.cameras.main.setZoom(Phaser.Math.Clamp(Math.min(this.scale.width / ARENA.width, this.scale.height / ARENA.height), .55, 1.5)); }
