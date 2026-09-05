@@ -10,3 +10,6 @@ coverage/
 *-recovery-and-foundation-*.sha256
 *-combat-foundation-*.zip
 *-combat-foundation-*.sha256
+test-results/
+playwright-report/
+.recovery-evidence/

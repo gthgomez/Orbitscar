@@ -33,3 +33,9 @@ jobs:
 
       - name: Run complete local gate
         run: pnpm check
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser contract tests
+        run: pnpm test:browser

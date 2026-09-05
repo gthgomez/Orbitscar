@@ -2,9 +2,9 @@ import type { OrbitscarBattleInput, OrbitscarBattleResult, OrbitscarPosition } f
 import type { OrbitscarContent, OrbitscarResourceBundle } from "@orbitscar/content";
 import { authoritativeDigest, canonicalSerialize } from "./hash.js";
 
-export const COLONY_SCHEMA_VERSION = 2;
+export const COLONY_SCHEMA_VERSION = 3;
 export type ColonyBuilding = { id: string; buildingId: string; position: OrbitscarPosition; level: number; health: number };
-export type ColonyReport = { id: string; createdAt: string; result: OrbitscarBattleResult };
+export type ColonyReport = { id: string; attemptId: string; createdAt: string; result: OrbitscarBattleResult };
 export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
 export type ColonySave = { schemaVersion: number; payload: ColonyState; checksum: string };
 
@@ -49,10 +49,44 @@ export function trainUnits(state: ColonyState, unitId: string, count: number, co
   const definition = content.units[unitId]; if (!definition) throw new Error(`unknown unit '${unitId}'`); if (!Number.isInteger(count) || count < 1) throw new Error("count must be a positive integer"); const cost: OrbitscarResourceBundle = {}; for (const [id, amount] of Object.entries(definition.cost)) cost[id] = amount * count; if (!canAfford(state.resources, cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, cost); next.reserves[unitId] = (next.reserves[unitId] ?? 0) + count; next.updatedAt = now(); return next;
 }
 
-export function applyBattleResult(state: ColonyState, _input: OrbitscarBattleInput, result: OrbitscarBattleResult): ColonyState {
-  if (state.reports.some((report) => report.result.outcomeHash === result.outcomeHash)) return clone(state);
-  const deployed: Record<string, number> = {}; for (const usage of result.deploymentUsage) for (const entry of usage.units) deployed[entry.unitId] = (deployed[entry.unitId] ?? 0) + entry.count; for (const [unitId, count] of Object.entries(deployed)) if ((state.reserves[unitId] ?? 0) < count) throw new Error(`insufficient reserve for '${unitId}'`); const next = clone(state); for (const [unitId, count] of Object.entries(deployed)) { next.reserves[unitId] -= count; const survivors = Math.max(0, count - (result.attackerCasualties[unitId] ?? 0)); next.reserves[unitId] += survivors; } next.resources = sumBundle(next.resources, result.loot); next.reports.unshift({ id: `report-${next.reports.length + 1}`, createdAt: now(), result: clone(result) }); next.updatedAt = now(); return next;
+export function applyBattleResult(state: ColonyState, input: OrbitscarBattleInput, result: OrbitscarBattleResult, attemptId: string): ColonyState {
+  if (attemptId.trim().length === 0) throw new Error("attemptId must be a non-empty string");
+  if (state.reports.some((report) => report.attemptId === attemptId)) return clone(state);
+  const deployed: Record<string, number> = {};
+  for (const usage of result.deploymentUsage) {
+    for (const entry of usage.units) deployed[entry.unitId] = (deployed[entry.unitId] ?? 0) + entry.count;
+  }
+  for (const [unitId, count] of Object.entries(deployed)) {
+    const casualties = result.attackerCasualties[unitId] ?? 0;
+    const survivors = result.survivingUnits[unitId];
+    const armyCount = input.army.find((entry) => entry.unitId === unitId)?.count ?? count;
+    if (!Number.isInteger(count) || count < 0 || (state.reserves[unitId] ?? 0) < count) throw new Error(`insufficient reserve for '${unitId}'`);
+    if (!Number.isInteger(casualties) || casualties < 0 || casualties > count) throw new Error(`invalid casualties for '${unitId}'`);
+    if (!Number.isInteger(armyCount) || armyCount < count) throw new Error(`army reconciliation failed for '${unitId}'`);
+    if (survivors !== undefined && (!Number.isInteger(survivors) || survivors < 0 || survivors > armyCount || survivors !== armyCount - casualties)) throw new Error(`survivor reconciliation failed for '${unitId}'`);
+  }
+  const next = clone(state);
+  for (const [unitId, count] of Object.entries(deployed)) {
+    next.reserves[unitId] -= count;
+    next.reserves[unitId] += count - (result.attackerCasualties[unitId] ?? 0);
+  }
+  next.resources = sumBundle(next.resources, result.loot);
+  next.reports.unshift({ id: attemptId, attemptId, createdAt: now(), result: clone(result) });
+  next.updatedAt = now();
+  return next;
 }
 
 export function serializeColony(state: ColonyState): string { const payload = clone(state); const save: ColonySave = { schemaVersion: COLONY_SCHEMA_VERSION, payload, checksum: authoritativeDigest(payload) }; return canonicalSerialize(save); }
-export function parseColonySave(serialized: string): ColonyState { let parsed: unknown; try { parsed = JSON.parse(serialized); } catch { throw new Error("colony save is not valid JSON"); } if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("colony save must be an object"); const save = parsed as Partial<ColonySave>; if (save.payload === undefined || typeof save.checksum !== "string" || (save.schemaVersion !== 1 && save.schemaVersion !== COLONY_SCHEMA_VERSION)) throw new Error("unsupported colony save schema"); if (authoritativeDigest(save.payload) !== save.checksum) throw new Error("colony save checksum mismatch"); const payload = clone(save.payload); if (save.schemaVersion === 1) { payload.schemaVersion = COLONY_SCHEMA_VERSION; payload.settings = payload.settings ?? { muted: false, reducedMotion: false }; } return payload; }
+export function parseColonySave(serialized: string): ColonyState {
+  let parsed: unknown;
+  try { parsed = JSON.parse(serialized); } catch { throw new Error("colony save is not valid JSON"); }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("colony save must be an object");
+  const save = parsed as Partial<ColonySave>;
+  if (save.payload === undefined || typeof save.checksum !== "string" || (save.schemaVersion !== 1 && save.schemaVersion !== 2 && save.schemaVersion !== COLONY_SCHEMA_VERSION)) throw new Error("unsupported colony save schema");
+  if (authoritativeDigest(save.payload) !== save.checksum) throw new Error("colony save checksum mismatch");
+  const payload = clone(save.payload);
+  payload.schemaVersion = COLONY_SCHEMA_VERSION;
+  payload.settings = payload.settings ?? { muted: false, reducedMotion: false };
+  payload.reports = (payload.reports ?? []).map((report, index) => ({ ...report, attemptId: report.attemptId ?? report.id ?? `legacy-attempt-${index + 1}` }));
+  return payload;
+}

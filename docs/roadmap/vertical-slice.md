@@ -1,6 +1,6 @@
 # Project Orbitscar — Vertical Slice
 
-**Status:** LOCAL PLAYABLE SLICE V0.2 — automated acceptance in place; human blind-test gates remain open.
+**Status:** LOCAL PLAYABLE SLICE V0.3 — simulation regression coverage, client state seams, and an automated Playwright browser contract suite in place; human blind-test gates remain open.
 
 ## Slice question
 
@@ -15,10 +15,10 @@ Is constructing a small base and directly attacking one base fun, legible, and r
 - One commander: Mara Voss with Emergency Reroute.
 - Three resources with stub faucets/sinks.
 - Three authored NPC bases with distinct layouts, rewards, and difficulty bands.
-- Scout snapshot with confidence/staleness.
-- Three deployment charges with interactive multi-wave reinforcement timing.
+- Scout layout snapshot with visible roles, ranges, exposed resources, and counter hints.
+- Three deployment charges with deterministic staged reinforcement timing; live mid-battle reinforcement remains the next client milestone.
 - One ability, win/partial/retreat/loss states.
-- Deterministic battle seed, event stream, result hash, read-only replay, and idempotent report reconciliation.
+- Deterministic battle seed, event stream, result hash, read-only replay, explicit retreat command, and attempt-ID settlement reconciliation.
 - Post-battle report with losses, structures, plan summary, and next-action hint.
 
 ## Acceptance criteria
@@ -30,7 +30,7 @@ Is constructing a small base and directly attacking one base fun, legible, and r
 5. Report identifies which defense/placement caused the outcome.
 6. A failed battle does not corrupt resources, unit ownership, or base layout.
 7. Illegal placement, capacity overflow, duplicate event, and invalid ability are rejected by the local simulation authority adapter. Stale-snapshot rejection is a future remote-server acceptance criterion because this slice has no production server or versioned remote snapshots.
-8. Web keyboard/mouse and touch input both complete the flow.
+8. Web keyboard/mouse input is exercised by the automated browser contract suite; touch input follows the same pointer path and still needs a real-device human pass.
 9. Low-effects mode preserves target tags, drops, hit events, and report meaning.
 10. Five blind testers: ≥60% start a second attack and ≥60% explain one counter.
 

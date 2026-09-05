@@ -40,3 +40,7 @@ Use modular plinth tiles, edges/cliffs, mineral deposits, craters, roads/platfor
 - Four-direction or eight-direction requirements are decided per unit by readability tests.
 - Compression is platform-specific and verified visually; do not commit source caches.
 - Every asset commit includes provenance JSON: prompt/tool/model/date, generalized references, transformation intent, reviewer, similarity decision, and revision.
+
+## Prototype manifest
+
+The first vertical-slice pack uses `apps/web/public/art/orbitscar/asset-manifest.json` as its stable presentation mapping. Entries are replaceable and record source/provenance and pending project-owned license status. This is a prototype asset boundary, not a final art catalog.

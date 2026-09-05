@@ -21,6 +21,7 @@ pnpm install
 pnpm validate:content
 pnpm typecheck
 pnpm test
+pnpm test:browser
 pnpm simulate -- fixtures/battle_fixture.json
 pnpm --filter @orbitscar/web build
 pnpm check
