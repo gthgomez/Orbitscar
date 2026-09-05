@@ -35,4 +35,4 @@ The four destinations are sufficient for the first release because each maps to 
 3. Cost, risk, and expected consequence.
 4. Long-term progress.
 
-The colony/sector remains visually dominant. Critical text is always paired with a plain-language label; icons are not the sole language.
+The colony/sector remains visually dominant. Critical text is always paired with a plain-language label; icons are not the sole language. In the current local slice, the primary navigation is represented by Colony, Targets, and Army; Alliance, research, cosmetics, and server-backed reports remain future surfaces.

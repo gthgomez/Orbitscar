@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { authoritativeDigest, canonicalSerialize, hashOrbitscarCanonicalInput, parseOrbitscarBattleScenario, resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarCommand } from "./orbitscar.js";
+import { authoritativeDigest, calculateOrbitscarReward, canonicalSerialize, hashOrbitscarCanonicalInput, parseOrbitscarBattleScenario, resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarCommand } from "./orbitscar.js";
 import { sha256Hex } from "./hash.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
@@ -101,5 +101,24 @@ describe("Orbitscar deterministic spatial combat", () => {
     badContent.units.line_rigger.targetPriority = [{ selector: "tag", tag: "legacy_target" }];
     expect(() => parseOrbitscarContent(badContent)).toThrow("unknown target tag");
     expect(() => resolveOrbitscarBattle({ ...parseOrbitscarBattleScenario(bad, content), rulesetVersion: "other-ruleset-1" })).toThrow("rulesetVersion must match loaded content");
+  });
+
+  it("uses the authored encounter preview as the full-breach reward source of truth", () => {
+    for (const encounter of Object.values(content.encounters)) {
+      const input = { ...parseOrbitscarBattleScenario(scenario, content), structures: encounter.structures, rewardPreview: encounter.rewardPreview };
+      expect(calculateOrbitscarReward(input, encounter.structures.map((structure) => structure.id))).toEqual(encounter.rewardPreview);
+      expect(calculateOrbitscarReward(input, [])).toEqual({});
+    }
+  });
+
+  it("records retreat as a deterministic command and ends the battle without salvage", () => {
+    const result = resolveOrbitscarBattle(inputWith([
+      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } },
+      { commandId: "retreat", sequence: 2, tick: 60, type: "RETREAT", payload: {} },
+    ]));
+    expect(result.retreated).toBe(true);
+    expect(result.winner).toBe("defender");
+    expect(result.loot).toEqual({});
+    expect(result.events.some((event) => event.type === "battle_ended")).toBe(true);
   });
 });

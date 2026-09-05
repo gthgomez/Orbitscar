@@ -25,13 +25,13 @@ Same canonical seed/input/ruleset → byte-equivalent event stream, result, and 
 - ownership invariants preserved during capture;
 - replay cannot mutate state.
 
-## Integration
+## Integration (current status)
 
-Account → base → train → scout → attack → resolve → reward → report → replay. Exercise memory and PostgreSQL stores separately, then a persistence restart.
+Simulation coverage exercises base → train → attack → resolve → reward → report → replay and persistence restart. A browser smoke flow is the next certification gate; this local prototype has no account or PostgreSQL store.
 
 ## Platform
 
-Web: Chromium/Firefox and low-end mobile browser, responsive orientations, IndexedDB/session behavior.
+Web: Chromium/Firefox and low-end mobile browser, responsive orientations, localStorage behavior, tap/drag/pinch input, and console-error capture. The client smoke should cover the complete colony-to-second-attack loop.
 
 Android: phone, tablet, foldable, API target, safe areas, touch, suspend/resume, back navigation, crash and thermal session.
 

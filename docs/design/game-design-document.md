@@ -74,3 +74,9 @@ Build and route power → collect and convert → research a counter → train a
 - Former Edgeworld players identify broad lineage while rating “not a remake” ≥4/5.
 
 These are decision thresholds, not market facts.
+
+## Remediation doctrine (V0.3)
+
+Preserve the persistent colony rhythm, scout → compose → deploy, capacity-constrained forces, multiple reinforcement opportunities, autonomous battle, meaningful layout, battle reports, and the future alliance/territory layer. Modernize visual fidelity, performance, responsive input, information architecture, onboarding, accessibility, replay clarity, fairness, and the monetization philosophy. Do not copy names, lore, exact art, UI chrome, sounds, maps, values, factions, assets, code, or one-to-one expressive counterparts.
+
+The current local slice implements the colony loop, deterministic staged deployment, replay/report, explicit retreat, and local settlement. Live mid-battle reinforcement, alliance/territory, backend authority, audio, and final art remain planned rather than complete.

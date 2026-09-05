@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "pack": "orbitscar-vertical-slice-v1",
+  "provenance": "Original hand-authored SVG silhouettes created for the Orbitscar prototype; no external image or game asset was used.",
+  "assets": [
+    { "assetId": "structure.command_relay.base.v1", "gameplayIds": ["command_relay"], "file": "command-relay.svg", "dimensions": [128, 128], "source": "hand-authored SVG", "licenseStatus": "project-owned-pending-final-policy", "replacementStatus": "replaceable" },
+    { "assetId": "structure.matter_extractor.base.v1", "gameplayIds": ["matter_extractor"], "file": "matter-extractor.svg", "dimensions": [128, 128], "source": "hand-authored SVG", "licenseStatus": "project-owned-pending-final-policy", "replacementStatus": "replaceable" },
+    { "assetId": "structure.arc_projector.base.v1", "gameplayIds": ["arc_projector"], "file": "arc-projector.svg", "dimensions": [128, 128], "source": "hand-authored SVG", "licenseStatus": "project-owned-pending-final-policy", "replacementStatus": "replaceable" },
+    { "assetId": "unit.line_rigger.base.v1", "gameplayIds": ["line_rigger"], "file": "line-rigger.svg", "dimensions": [96, 96], "source": "hand-authored SVG", "licenseStatus": "project-owned-pending-final-policy", "replacementStatus": "replaceable" },
+    { "assetId": "unit.needle_drone.base.v1", "gameplayIds": ["needle_drone"], "file": "needle-drone.svg", "dimensions": [96, 96], "source": "hand-authored SVG", "licenseStatus": "project-owned-pending-final-policy", "replacementStatus": "replaceable" },
+    { "assetId": "effect.deployment_marker.base.v1", "gameplayIds": ["deployment_marker"], "file": "deployment-marker.svg", "dimensions": [160, 160], "source": "hand-authored SVG", "licenseStatus": "project-owned-pending-final-policy", "replacementStatus": "replaceable" }
+  ]
+}

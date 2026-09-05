@@ -39,7 +39,7 @@ describe("Orbitscar persistent colony loop", () => {
     const input = parseOrbitscarBattleScenario(fixture, content);
     const battleInput = { ...input, army: [{ unitId: "line_rigger", count: 3 }], commands: [{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 3 }] } }] };
     const result = resolveOrbitscarBattle(battleInput);
-    const after = applyBattleResult(initial, battleInput, result);
+    const after = applyBattleResult(initial, battleInput, result, "attempt-1");
     expect(after.reports).toHaveLength(1);
     expect(after.reserves.line_rigger).toBe(result.survivingUnits.line_rigger);
     expect(after.resources.alloy).toBeGreaterThanOrEqual(initial.resources.alloy);
@@ -47,6 +47,29 @@ describe("Orbitscar persistent colony loop", () => {
     expect(parseColonySave(serialized)).toEqual(after);
     const tampered = serialized.replace('"playerId":"test-player"', '"playerId":"intruder"');
     expect(() => parseColonySave(tampered)).toThrow("checksum mismatch");
-    expect(applyBattleResult(after, battleInput, result)).toEqual(after);
+    expect(applyBattleResult(after, battleInput, result, "attempt-1")).toEqual(after);
+  });
+
+  it("settles identical deterministic results twice when they are separate attempts", () => {
+    const initial = trainUnits(createColony("test-player", content), "line_rigger", 6, content);
+    const input = parseOrbitscarBattleScenario(fixture, content);
+    const battleInput = { ...input, army: [{ unitId: "line_rigger", count: 3 }], commands: [{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 3 }] } }] };
+    const result = resolveOrbitscarBattle(battleInput);
+    const once = applyBattleResult(initial, battleInput, result, "attempt-a");
+    const twice = applyBattleResult(once, battleInput, result, "attempt-b");
+    expect(result.outcomeHash).toBe(resolveOrbitscarBattle(battleInput).outcomeHash);
+    expect(once.reports).toHaveLength(1);
+    expect(twice.reports).toHaveLength(2);
+    expect(twice.reserves.line_rigger).toBe(initial.reserves.line_rigger - (result.attackerCasualties.line_rigger ?? 0) * 2);
+    expect(applyBattleResult(twice, battleInput, result, "attempt-b")).toEqual(twice);
+  });
+
+  it("keeps undeployed reserve units when a plan resolves after its first wave", () => {
+    const initial = trainUnits(createColony("test-player", content), "line_rigger", 6, content);
+    const input = parseOrbitscarBattleScenario(fixture, content);
+    const battleInput = { ...input, army: [{ unitId: "line_rigger", count: 6 }], commands: [{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 3 }] } }] };
+    const result = resolveOrbitscarBattle(battleInput);
+    const after = applyBattleResult(initial, battleInput, result, "partial-plan");
+    expect(after.reserves.line_rigger).toBe(6 - (result.attackerCasualties.line_rigger ?? 0));
   });
 });
