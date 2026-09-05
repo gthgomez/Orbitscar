@@ -58,3 +58,10 @@
 - Choice: Phaser 3 + TypeScript + Vite for this prototype, with simulation kept renderer-independent.
 - Downside: Android packaging and WebView behavior remain unverified, and the bundle is currently over Vite's 500 kB warning threshold.
 - Reconsider when: the battle slice fails on low-end Android or Phaser cannot sustain the measured entity/event budget.
+
+## D-007 — settlement occurrence identity
+
+- **Question:** How should local settlement distinguish repeated legitimate deterministic battles from replayed settlement requests?
+- **Choice:** Keep canonical, outcome, and snapshot hashes as verification identities, but require a separate `attemptId` for each occurrence. Persist attempt IDs in colony reports and dedupe only by that ID.
+- **Why:** identical deterministic inputs can be legitimate separate attacks; an outcome hash alone cannot identify occurrence.
+- **Downside:** callers must carry an attempt ID through the report flow and older saves require migration.

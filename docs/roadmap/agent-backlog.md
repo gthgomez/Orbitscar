@@ -20,7 +20,7 @@ Each task is intentionally small enough for an independent agent and names its n
 | S-001 | Add canonical Orbitscar battle types | `packages/combat/src/orbitscar.ts` | D-001 | serialize/validate deterministic inputs; no UI | medium / pure module |
 | S-002 | Add seeded event resolver | `packages/combat/src/orbitscar.ts`, tests | S-001 | same input/hash twice; no current resolver changes | high / tests |
 | C-001 | Build placement sandbox | `apps/web/src/...` | D-002 | touch/mouse placement and preview; no alliance screens | medium / slice UI |
-| C-002 | Build replay/report viewer | `apps/web/src/...` | S-002 | read-only event timeline; no outcome mutation | medium / report UI |
+| C-002 | Build replay/report viewer | `apps/web/src/ui`, `apps/web/src/game` | S-002 | read-only event timeline, retreat action, tactical report; no outcome mutation | medium / report UI |
 
 ## Backend/security
 
@@ -37,6 +37,6 @@ Each task is intentionally small enough for an independent agent and names its n
 | U-001 | Implement semantic UI tokens | `apps/web/src/...` | IA doc | token names used by slice; no visual clone | low / token module |
 | A-001 | Create original debug asset pack | `apps/web/public/art/orbitscar` | art bible | generated/handmade SVG/flat shapes with provenance; no Edgeworld refs | low / provenance pack |
 | T-001 | Add headless balance command | `packages/combat`, scripts | S-002 | 1k seeded runs and JSONL summary; no CI threshold yet | medium / harness |
-| T-002 | Add responsive browser smoke | `.github`, web e2e | C-001 | desktop/mobile viewport checks; no store test | medium / e2e |
+| T-002 | Add responsive browser smoke | `.github`, web e2e | C-001 | desktop/mobile viewport checks, second attack, console capture; no store test | medium / e2e |
 | I-001 | Make CI run campaign data/schema checks | `.github/workflows/ci.yml` | D-001 | validate JSON; do not alter existing workflow semantics without review | medium / CI patch |
 | I-002 | Verify Android shell option | `docs/architecture/architecture-decision-record.md` | phase 2 | measured Capacitor/Godot spike; no production shell | medium / decision update |

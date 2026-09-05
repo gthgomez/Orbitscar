@@ -70,6 +70,17 @@ export type OrbitscarCommanderDefinition = {
   charges: number;
 };
 
+export type OrbitscarEncounterDefinition = {
+  id: string;
+  name: string;
+  codename: string;
+  difficulty: "cautious" | "contested" | "severe";
+  description: string;
+  rewardPreview: OrbitscarResourceBundle;
+  structures: Array<{ id: string; buildingId: string; position: { x: number; y: number }; currentHealth?: number }>;
+  suggestedCounters: string[];
+};
+
 export type OrbitscarContent = {
   schemaVersion: number;
   contentSet: string;
@@ -80,6 +91,7 @@ export type OrbitscarContent = {
   units: Record<string, OrbitscarUnitDefinition>;
   abilities: Record<string, OrbitscarAbilityDefinition>;
   commanders: Record<string, OrbitscarCommanderDefinition>;
+  encounters: Record<string, OrbitscarEncounterDefinition>;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -235,5 +247,32 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
     if (abilities[commander.abilityId] === undefined) throw new Error(`commander '${commander.id}' references unknown ability '${commander.abilityId}'`);
   }
 
-  return { schemaVersion, contentSet, rulesetVersion, resources, buildings, defenses, units, abilities, commanders };
+  const rawEncounters = input.encounters === undefined ? {} : record(input.encounters, "encounters");
+  const encounters = uniqueIds(
+    Object.entries(rawEncounters).map(([id, raw]) => {
+      const item = record(raw, `encounters.${id}`);
+      const difficulty = stringValue(item.difficulty, `encounters.${id}.difficulty`);
+      if (!["cautious", "contested", "severe"].includes(difficulty)) throw new Error(`encounters.${id}.difficulty is unknown`);
+      const rawStructures = item.structures;
+      if (!Array.isArray(rawStructures) || rawStructures.length === 0) throw new Error(`encounters.${id}.structures must be a non-empty array`);
+      const structures = rawStructures.map((rawStructure, index) => {
+        const structure = record(rawStructure, `encounters.${id}.structures[${index}]`);
+        const position = record(structure.position, `encounters.${id}.structures[${index}].position`);
+        const result = {
+          id: stringValue(structure.id, `encounters.${id}.structures[${index}].id`),
+          buildingId: stringValue(structure.buildingId, `encounters.${id}.structures[${index}].buildingId`),
+          position: { x: finiteNumber(position.x, `encounters.${id}.structures[${index}].position.x`), y: finiteNumber(position.y, `encounters.${id}.structures[${index}].position.y`) },
+          ...(structure.currentHealth === undefined ? {} : { currentHealth: finiteNumber(structure.currentHealth, `encounters.${id}.structures[${index}].currentHealth`) }),
+        };
+        if (buildings[result.buildingId] === undefined) throw new Error(`encounter '${id}' references unknown building '${result.buildingId}'`);
+        return result;
+      });
+      const structureIds = structures.map((structure) => structure.id);
+      if (new Set(structureIds).size !== structureIds.length) throw new Error(`encounter '${id}' contains duplicate structure IDs`);
+      return { id, name: stringValue(item.name, `encounters.${id}.name`), codename: stringValue(item.codename, `encounters.${id}.codename`), difficulty: difficulty as OrbitscarEncounterDefinition["difficulty"], description: stringValue(item.description, `encounters.${id}.description`), rewardPreview: resourceBundle(item.rewardPreview, `encounters.${id}.rewardPreview`), structures, suggestedCounters: stringArray(item.suggestedCounters, `encounters.${id}.suggestedCounters`) };
+    }),
+    "encounters",
+  );
+
+  return { schemaVersion, contentSet, rulesetVersion, resources, buildings, defenses, units, abilities, commanders, encounters };
 }

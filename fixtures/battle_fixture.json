@@ -7,6 +7,7 @@
   "deploymentCapacity": 10,
   "maxDeploymentCharges": 3,
   "commanderId": "mara_voss",
+  "rewardPreview": { "alloy": 36, "volatile": 14, "signal": 6 },
   "army": [
     { "unitId": "line_rigger", "count": 3 },
     { "unitId": "pulse_marksman", "count": 2 },

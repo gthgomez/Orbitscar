@@ -6,12 +6,13 @@ The working title is provisional and has not received trademark, domain, or stor
 
 ## Current boundary
 
-- `packages/simulation/` — deterministic, headless battle rules.
-- `packages/content/` — declarative prototype content and validation.
+- `packages/simulation/` — deterministic, headless battle and persistent-colony rules.
+- `packages/content/` — declarative buildings, units, defenses, commanders, authored NPC targets, and validation.
 - `fixtures/` — small reproducible battle inputs.
+- `apps/web/` — Phaser tactical view plus an accessible DOM command surface for colony, target, army, deployment, replay, and report states.
 - `docs/` — recovered research plus independent product, architecture, UX, art, economy, security, testing, and roadmap records.
 
-The immediate product gate is whether a short colony breach is fun. Alliances, live operations, monetization, and a persistent backend are deliberately deferred.
+The current product gate is a coherent local colony-to-breach loop: build, train, scout, compose, deploy, watch autonomous combat, read the report, and return with reconciled survivors and salvage. Alliances, live operations, monetization, and a persistent backend remain deliberately deferred.
 
 ## Local commands
 
@@ -20,10 +21,12 @@ pnpm install
 pnpm validate:content
 pnpm typecheck
 pnpm test
+pnpm test:browser
 pnpm simulate -- fixtures/battle_fixture.json
 pnpm --filter @orbitscar/web build
+pnpm check
 
-The visual prototype lives in `apps/web` and is intentionally Phaser-only for real-time battle rendering; React is not a dependency.
+The browser client is intentionally Phaser-only for tactical rendering; React is not a dependency.
 ```
 
 The project is repo-ready but unpublished. Do not add Tideforge as a workspace, package source, Git submodule, or development dependency.

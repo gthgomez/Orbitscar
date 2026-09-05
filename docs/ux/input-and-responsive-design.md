@@ -40,3 +40,7 @@ Desktop/laptop: larger board, optional side-by-side scout/report panels, no extr
 - Combat target 60 fps on target mid Android, graceful 30 fps mode under load.
 - Effects mode must reduce particles, shadows, and screen shake without hiding event labels.
 - No hover-only information; no 1px map target.
+
+## V0.3 implementation note
+
+The Phaser scene now supports tap selection, drag pan, wheel zoom, two-pointer pinch zoom, snap-grid placement preview, and deployment-zone selection with three active pointers. The DOM command surface uses keyboard-accessible buttons with visible alternatives. Scrolling and browser certification on representative mobile devices remain verification work, not a completed claim.

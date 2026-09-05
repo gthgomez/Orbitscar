@@ -25,13 +25,13 @@ Same canonical seed/input/ruleset → byte-equivalent event stream, result, and 
 - ownership invariants preserved during capture;
 - replay cannot mutate state.
 
-## Integration
+## Integration (current status)
 
-Account → base → train → scout → attack → resolve → reward → report → replay. Exercise memory and PostgreSQL stores separately, then a persistence restart.
+Simulation coverage exercises base → train → attack → resolve → reward → report → replay and persistence restart. A Playwright browser contract suite (`pnpm test:browser`) exercises the production build end to end: economy, construction, capacity limits, three-wave deployment with the charge limit, commander ability, autonomous battle with measured health-bar decay, retreat, report reconciliation, reload persistence, legacy save migration, tamper fail-safety, and a mobile-viewport loop. Automated browser evidence is not a substitute for human playtesting.
 
 ## Platform
 
-Web: Chromium/Firefox and low-end mobile browser, responsive orientations, IndexedDB/session behavior.
+Web: Chromium/Firefox and low-end mobile browser, responsive orientations, localStorage behavior, tap/drag/pinch input, and console-error capture. The client smoke should cover the complete colony-to-second-attack loop.
 
 Android: phone, tablet, foldable, API target, safe areas, touch, suspend/resume, back navigation, crash and thermal session.
 

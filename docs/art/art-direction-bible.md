@@ -29,3 +29,7 @@ Choose a stylized orbital-industrial diorama: high-angle camera, modular plinths
 ## Originality gate
 
 The direction is acceptable only if a former player recognizes the broad colony-defense lineage but cannot name a one-to-one counterpart for a building, unit, UI frame, map tile, or portrait.
+
+## First production slice
+
+The initial replaceable presentation pack is a small set of original hand-authored SVG silhouettes under `apps/web/public/art/orbitscar`. It covers the command relay, extractor, arc projector, two representative units, and a deployment marker. Most scene rendering remains procedural geometry until asset integration is measured at phone and high-DPI sizes.
