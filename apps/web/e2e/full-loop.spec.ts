@@ -164,15 +164,16 @@ test.describe.serial("Orbitscar vertical slice", () => {
 
   test("retreat ends a battle early without salvage", async ({ page }) => {
     await freshColony(page);
-    await act(page, "train:needle_drone");
+    // a force that survives long enough for the retreat window to be stable
+    for (let i = 0; i < 9; i++) await act(page, "train:line_rigger");
     await navTo(page, "targets");
     await act(page, "scout:glass-spine");
     await navTo(page, "army");
-    await act(page, "army:+:needle_drone");
+    for (let i = 0; i < 9; i++) await act(page, "army:+:line_rigger");
     await act(page, "begin-deployment");
     await deployWave(page, "west", 0);
     await act(page, "resolve-battle");
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(2000);
     await act(page, "retreat");
     await waitForBattleEnd(page);
     await act(page, "report");

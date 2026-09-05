@@ -22,6 +22,7 @@ pnpm validate:content
 pnpm typecheck
 pnpm test
 pnpm test:browser
+pnpm evaluate -- --runs 1344 --out runs/eval-local
 pnpm simulate -- fixtures/battle_fixture.json
 pnpm --filter @orbitscar/web build
 pnpm check
