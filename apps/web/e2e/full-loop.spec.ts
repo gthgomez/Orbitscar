@@ -275,4 +275,28 @@ test.describe.serial("Orbitscar vertical slice", () => {
     const state = await colonyState(page);
     expect(state.reports.length).toBe(1);
   });
+
+  test("low-effects readability preference persists and preserves battle completion", async ({ page }) => {
+    await freshColony(page);
+    await act(page, "toggle-readability");
+    expect((await colonyState(page)).settings.reducedMotion, "preference persisted to the colony save").toBe(true);
+    await page.reload();
+    expect(await page.locator(".readability-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect((await page.locator(".shell").getAttribute("class")) ?? "").toContain("low-effects");
+    // a full battle still resolves with calmer updates; no gameplay information is lost
+    for (let i = 0; i < 9; i++) await act(page, "train:line_rigger");
+    await navTo(page, "targets");
+    await act(page, "scout:cinder-yard");
+    await navTo(page, "army");
+    for (let i = 0; i < 9; i++) await act(page, "army:+:line_rigger");
+    await act(page, "begin-deployment");
+    await deployWave(page, "west", 0);
+    await act(page, "resolve-battle");
+    await waitForBattleEnd(page);
+    await act(page, "report");
+    await act(page, "return-home");
+    const settled = await colonyState(page);
+    expect(settled.reports).toHaveLength(1);
+    expect(settled.settings.reducedMotion).toBe(true);
+  });
 });
