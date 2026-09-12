@@ -33,3 +33,15 @@ The browser client is intentionally Phaser-only for tactical rendering; React is
 Human blind-test instrumentation lives in `docs/playtest/` (protocol, observation form, session checklist); the item-10 gate remains BLOCKED_ON_HUMAN_PLAYTEST until five real sessions are recorded.
 
 The project is repo-ready but unpublished. Do not add Tideforge as a workspace, package source, Git submodule, or development dependency.
+
+## License
+
+Project Orbitscar is **proprietary**. This repository is public for viewing and
+development transparency, but public visibility does not grant permission to
+copy, modify, redistribute, sublicense, sell, commercially exploit, or create
+derivative works from the project's original source, design, art, or content.
+See [LICENSE.md](LICENSE.md).
+
+Third-party dependencies (for example Phaser and Vite) remain under their own
+license terms. The working title "Project Orbitscar" is provisional and has not
+received trademark, domain, or store clearance.
