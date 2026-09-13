@@ -40,7 +40,7 @@ Project Orbitscar is **proprietary**. This repository is public for viewing and
 development transparency, but public visibility does not grant permission to
 copy, modify, redistribute, sublicense, sell, commercially exploit, or create
 derivative works from the project's original source, design, art, or content.
-See [LICENSE.md](LICENSE.md).
+See [LICENSE](LICENSE).
 
 Third-party dependencies (for example Phaser and Vite) remain under their own
 license terms. The working title "Project Orbitscar" is provisional and has not
