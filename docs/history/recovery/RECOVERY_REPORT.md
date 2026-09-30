@@ -1,5 +1,7 @@
 # Orbitscar recovery and clean-room foundation report
 
+> **HISTORICAL RECORD — NOT CURRENT STATE.** This is a point-in-time report dated 2026-08-30, archived under `docs/history/recovery/` for provenance. Statements such as "no commit exists yet" and "Remote: none" describe the repository as it was on that date only. The repository now has commit history and a public remote (`https://github.com/gthgomez/Orbitscar`). "Clean-room" in this document refers to the independent-implementation and recovery process described below; it is not a legal conclusion (see `docs/adversarial/originality-review.md`, which is itself preliminary and not legal advice).
+
 Audit date: 2026-08-30. This report records the repository separation, recovery, revalidation, and combat-readiness work.
 
 ## FINAL_VERDICT
@@ -147,7 +149,7 @@ Run the **Orbitscar Combat Vertical Slice Campaign**:
 
 ## SHARED_TOOLING_POLICY
 
-Current policy is recorded in [shared-tooling-policy.md](docs/architecture/shared-tooling-policy.md): keep simulation, content, rendering, and backend code local until a second project demonstrates genuine identical need.
+Current policy is recorded in [shared-tooling-policy.md](../../architecture/shared-tooling-policy.md): keep simulation, content, rendering, and backend code local until a second project demonstrates genuine identical need.
 
 ## REVIEW_BUNDLE
 

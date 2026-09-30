@@ -1,5 +1,8 @@
 # Orbitscar Combat Foundation Report
 
+> **HISTORICAL RECORD — NOT CURRENT STATE.** Point-in-time report dated 2026-08-30, archived under `docs/history/recovery/` for provenance. Test results and verdicts describe the repository as it was on that date and are superseded by later commits; they are preserved as recovery evidence, not as current claims.
+
+
 Audit date: 2026-08-30. This report supersedes the stale Vitest sentence in the earlier recovery narrative for the combat stage.
 
 ## FINAL_VERDICT
