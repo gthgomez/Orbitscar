@@ -1,6 +1,6 @@
 # Project Orbitscar
 
-Project Orbitscar is an independent clean-room sci-fi strategy prototype. It is a distinct game from Tideforge Empires. This repository has no runtime dependency on Tideforge code, content, namespaces, assets, or configuration.
+Project Orbitscar is an independent sci-fi strategy prototype, re-implemented separately from Tideforge Empires through a documented independent-implementation and recovery process ([recovery history](docs/history/recovery/README.md), [recovery manifest](docs/RECOVERY_MANIFEST.md)). It is a distinct game from Tideforge Empires. This repository has no runtime dependency on Tideforge code, content, namespaces, assets, or configuration. "Clean-room" describes this documented process; the preliminary originality review in `docs/adversarial/originality-review.md` is not a legal conclusion or clearance.
 
 The working title is provisional and has not received trademark, domain, or store clearance.
 
