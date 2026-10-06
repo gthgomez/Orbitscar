@@ -3,7 +3,7 @@
 ## Environment
 
 - [ ] `pnpm install --frozen-lockfile` completed cleanly
-- [ ] `pnpm check` green (typecheck, content, 23 unit tests, build)
+- [ ] `pnpm check` green (typecheck, content, 33 unit tests, build)
 - [ ] Production preview running: `pnpm build:web && pnpm --filter @orbitscar/web exec vite preview --port 4173`
 - [ ] `http://localhost:4173` loads to "Home colony"
 - [ ] DevTools open (Console visible), window maximized
