@@ -67,13 +67,16 @@ describe("Orbitscar deterministic spatial combat", () => {
   it("records doctrines in the canonical snapshot and applies their combat specialization", () => {
     const drop = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } };
     const army = [{ unitId: "line_rigger", count: 4 }];
-    const baseline = resolveOrbitscarBattle(inputWith([drop], { army, maxDurationTicks: 1000 }));
-    const poweredInput = inputWith([drop], { army, attackerDoctrineId: "power", maxDurationTicks: 1000 });
+    const relayOnly = [{ id: "relay", buildingId: "command_relay", position: { x: 400, y: 400 } }];
+    const baseline = resolveOrbitscarBattle(inputWith([drop], { army, structures: relayOnly, maxDurationTicks: 1000 }));
+    const poweredInput = inputWith([drop], { army, structures: relayOnly, attackerDoctrineId: "power", maxDurationTicks: 1000 });
     const powered = resolveOrbitscarBattle(poweredInput);
     expect(powered.canonicalHash).not.toBe(baseline.canonicalHash);
-    expect(powered.damageByEntity.relay).toBeGreaterThan(baseline.damageByEntity.relay);
-    const breach = resolveOrbitscarBattle(inputWith([drop], { army, attackerDoctrineId: "breach", maxDurationTicks: 1000 }));
-    expect(breach.damageByEntity.arc).toBeGreaterThan(baseline.damageByEntity.arc);
+    expect(powered.events.find((event) => event.type === "defense_destroyed" && event.entityId === "relay")?.tick).toBeLessThan(baseline.events.find((event) => event.type === "defense_destroyed" && event.entityId === "relay")?.tick ?? Number.POSITIVE_INFINITY);
+    const defenseScenario = [{ id: "relay", buildingId: "command_relay", position: { x: 900, y: 400 } }, { id: "arc", buildingId: "arc_projector", position: { x: 400, y: 400 } }];
+    const breach = resolveOrbitscarBattle(inputWith([drop], { army, structures: defenseScenario, attackerDoctrineId: "breach", maxDurationTicks: 1000 }));
+    const plainDefense = resolveOrbitscarBattle(inputWith([drop], { army, structures: defenseScenario, maxDurationTicks: 1000 }));
+    expect(breach.events.find((event) => event.type === "defense_destroyed" && event.entityId === "arc")?.tick).toBeLessThan(plainDefense.events.find((event) => event.type === "defense_destroyed" && event.entityId === "arc")?.tick ?? Number.POSITIVE_INFINITY);
   });
 
   it("keeps identical seeds stable while allowing a different seed to alter stochastic damage", () => {
@@ -126,6 +129,16 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(errors).toContain("duplicate command IDs"); expect(errors).toContain("globally unique"); expect(errors).toContain("outside the battle window"); expect(errors).toContain("invalid commander ability");
   });
 
+  it("rejects a deployment that spawns units inside an occupied footprint", () => {
+    const overlapping = inputWith([{ commandId: "inside", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "east", position: { x: 930, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } }]);
+    expect(validateOrbitscarInput(overlapping).errors.join(" ")).toContain("deployment 'inside' intersects structure 'relay'");
+  });
+
+  it("requires the actual deployment point to match its declared approach", () => {
+    const mislabeled = inputWith([{ commandId: "misroute", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 1080, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } }]);
+    expect(validateOrbitscarInput(mislabeled).errors.join(" ")).toContain("outside the west approach zone");
+  });
+
   it("makes deployment geography change target engagement and outcome", () => {
     const north = resolveOrbitscarBattle(inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "north", position: { x: 400, y: 60 }, units: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "line_rigger", count: 2 }] } }]));
     const south = resolveOrbitscarBattle(inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "line_rigger", count: 2 }] } }]));
@@ -133,6 +146,39 @@ describe("Orbitscar deterministic spatial combat", () => {
     const northRoute = north.events.find((event) => event.type === "unit_moved");
     const westRoute = south.events.find((event) => event.type === "unit_moved");
     expect(northRoute?.position).not.toEqual(westRoute?.position);
+  });
+
+  it("routes units around structure footprints instead of walking through them", () => {
+    const result = resolveOrbitscarBattle(inputWith([
+      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } },
+      { commandId: "focus", sequence: 2, tick: 0, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "relay" } },
+    ], {
+      army: [{ unitId: "line_rigger", count: 1 }],
+      structures: [
+        { id: "relay", buildingId: "command_relay", position: { x: 900, y: 400 } },
+        { id: "cradle-wall", buildingId: "drop_cradle", position: { x: 500, y: 360 } },
+      ],
+      maxDurationTicks: 500,
+    }));
+    const movement = result.events.filter((event) => event.type === "unit_moved");
+    expect(movement.length).toBeGreaterThan(20);
+    expect(movement.every((event) => !(event.position && event.position.x >= 500 && event.position.x < 580 && event.position.y >= 360 && event.position.y < 440))).toBe(true);
+    expect(movement.some((event) => event.position && (event.position.y < 360 || event.position.y >= 440))).toBe(true);
+  });
+
+  it("replans a disconnected route after attackers destroy a blocking module", () => {
+    const wall = Array.from({ length: 20 }, (_, index) => ({ id: `wall-${index}`, buildingId: "scatter_coil", position: { x: 480, y: index * 40 } }));
+    const result = resolveOrbitscarBattle(inputWith([
+      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 8 }, { unitId: "salvage_hauler", count: 1 }] } },
+      { commandId: "focus", sequence: 2, tick: 30, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "wall-10" } },
+    ], {
+      army: [{ unitId: "line_rigger", count: 8 }, { unitId: "salvage_hauler", count: 1 }],
+      structures: [{ id: "extractor", buildingId: "matter_extractor", position: { x: 900, y: 400 } }, { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } }, ...wall],
+      deploymentCapacity: 10,
+      maxDurationTicks: 1200,
+    }));
+    expect(result.events.some((event) => event.type === "defense_destroyed" && event.entityId === "wall-10")).toBe(true);
+    expect(result.events.some((event) => event.type === "unit_moved" && event.entityId === "salvage_hauler#0" && event.targetId === "extractor" && (event.position?.x ?? 0) > 520)).toBe(true);
   });
 
   it("makes reinforcement timing and ability timing observable", () => {

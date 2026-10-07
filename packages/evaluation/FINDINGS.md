@@ -12,6 +12,29 @@ The fixed-timing staging guard now focuses on contested and severe matchups. It 
 
 The post-change 1,344-run corpus completed twice, most recently after doctrine integration, with zero invariant violations and 1,200 unique outcome hashes. Neutral doctrine preserves the prior matchup aggregates: immediate timing 74.1%, half-half 46.1%, probe-reinforce 52.7%, and three waves 40.5%. Screen-line leads force archetypes at 79.2%, while several specialists are below 50%. Active gates guard against absolute sweeps but do not establish broad strategic parity. Next balance work should compare casualty and salvage efficiency by encounter and evaluate whether high aggregate win rates purchase poor tradeoffs. Human playtesting remains unverified. The splash regression currently verifies deterministic secondary impacts at the event level; a larger clustered-versus-separated balance study remains useful.
 
+## Spatial navigation iteration — ruleset 0.3.0
+
+Deterministic 40-unit-cell obstacle routing now uses building footprints, attack
+range to structure edges, and the declared approach zone. Deployment validation
+rejects squads whose actual spawn positions contradict the selected zone or
+intersect a structure. Routes are cached by target, obstacle topology, unit
+range, and starting cell; a change in surviving blockers invalidates the route.
+
+The full 1,344-run corpus completed in 19.9 seconds with zero invariant
+violations and 1,200 unique outcome hashes. Aggregate attacker win rates by
+composition: air-harass 87.0%, screen-line 83.9%, ranged-fortress 76.6%,
+anti-armor-punch 66.1%, skirmish-mix 62.0%, sabotage-strike 59.9%, and
+salvage-raid 31.3%. Immediate mass remains strongest by timing at 78.0%;
+half-half is 63.1%, probe-then-reinforce 69.9%, and three waves 55.7%. Zones
+now have a strong effect: west 49.4%, north 66.7%, south 77.1%, and east 73.5%.
+This is evidence that geometry and approach matter, and also evidence of
+remaining balance risks: air-harass and screen-line lead broadly, and the west
+approach underperforms sharply in the aggregate. These rates are evaluation
+results, not human fun or strategy-parity evidence.
+
+After moving obstacle topology signatures to a destruction-driven version
+counter, the exact 1,344-run JSONL output remained byte-for-byte identical.
+
 First T-001 baseline: **1,344 deterministic runs** (672 plans × 2 seed replicas)
 across all three authored encounters, seven force archetypes, four reinforcement
 timings, four approach zones, with and without the commander ability. Zero

@@ -4,37 +4,30 @@
 test is prepared here; the remaining gate requires real humans and cannot be
 fabricated. Do not record session data until sessions actually happen.
 
-## What is already proven without humans
+## Historical vertical-slice evidence
 
 - 33 unit tests, content validation, root+web typecheck, production build.
-- 10-spec Playwright browser contract on the production build: complete
-  colony-to-breach loop, deployment charge limits, capacity refusal, commander
-  ability, measured health-bar decay, retreat, report reconciliation, reload
-  persistence, legacy save migration, tamper fail-safety, every authored
-  encounter, and a mobile-viewport run.
+- The earlier vertical-slice branch had a 10-spec Playwright contract. That
+  suite predates current V1 progression and spatial-combat changes and is not
+  current browser-certification evidence.
 - 1,344-run deterministic combat evaluation with zero invariant violations
   (`packages/evaluation/FINDINGS.md`).
-- 10 deterministic balance scenario tests (`packages/evaluation/src/balance.test.ts`)
-  covering line-rigger dominance, mass-deployment dominance, and commander
-  value. Five always-on regression guards protect properties that currently
-  hold; five known-issue gates currently FAIL against ruleset 0.2.0,
-  reproducing the documented dominance issues as executable evidence. The
-  known-issue gates are skipped by default so `pnpm check` stays green for
-  session setup — run them explicitly with `BALANCE_GATES=1 pnpm test`. They
-  are the acceptance criteria for the candidate balance changes and the
-  regression guard if any dominance reappears. These tests make no claim
-  about fun or legibility.
+- Deterministic balance gates are active by default and passed after the
+  ruleset 0.3.0 spatial-navigation changes. They guard selected absolute
+  failures; aggregate strategy parity remains unproven.
+- The current V1 browser-certification phase has not run. Its scope is in
+  `docs/campaign/full-game/PLAN.md` and must use a production build after the
+  browser-free gates are complete.
 
 ## What only humans can answer (vertical-slice item 10)
 
 - Do five blind testers reach a second attack (target: ≥60%)?
 - Can ≥60% explain at least one counter to a defense after one session?
 - Is the colony-to-breach loop legible without narration?
-- Does the dominant strategy found by the harness (immediate mass deployment
-  of line riggers) *feel* degenerate in play? (Structurally, it is confirmed
-  degenerate: the line-rigger screen wins 12/12 measured scenarios at zero
-  casualties, and immediate mass deployment wins 14/14 on two of three
-  encounters — see `packages/evaluation/src/balance.test.ts`.)
+- Does the remaining high aggregate win rate for immediate mass deployment
+  and line-rigger screens feel degenerate in play? The current acceptance
+  gates prevent universal sweeps but do not establish broad strategy parity;
+  see `packages/evaluation/FINDINGS.md` for the last measured corpus.
 
 ## Package contents
 
