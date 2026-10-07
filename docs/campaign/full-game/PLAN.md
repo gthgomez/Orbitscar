@@ -17,6 +17,7 @@
 
 - The deterministic simulation remains the only combat rules engine for client, evaluation, replay and server.
 - Battle truth is initial snapshot + seed + ordered commands; presentation consumes authoritative events/results.
+- The shared battle validator caps simulations at 2,400 ticks (80 seconds at 30 ticks/second), matching every production constructor and bounding resolver work and event logs.
 - Local asynchronous server is sufficient; no cloud credentials or commercial hosting required.
 - Save changes are versioned and migrated; economy elapsed time is capped and clock rollback cannot mint resources.
 - Relay geography is static, validated content in the simulation package; only battle outcomes claim nodes. Ownership extends a connected frontier without adding passive combat power, and repeat PvE attacks have no salvage reward.

@@ -18,6 +18,13 @@ const baseCommands: OrbitscarCommand[] = [
 ];
 
 describe("Orbitscar deterministic spatial combat", () => {
+  it("rejects battles longer than the supported simulation window", () => {
+    expect(validateOrbitscarInput(inputWith([], { maxDurationTicks: 2400 })).ok).toBe(true);
+    const result = validateOrbitscarInput(inputWith([], { maxDurationTicks: 2401 }));
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain("maxDurationTicks must be at most 2400");
+  });
+
   it("canonicalizes order and uses a collision-resistant replay digest", () => {
     const first = inputWith(baseCommands);
     const deployment = baseCommands[0] as Extract<OrbitscarCommand, { type: "DEPLOY" }>;

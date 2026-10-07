@@ -20,6 +20,7 @@ export type OrbitscarBattleResult = { canonicalFormatVersion: number; rulesetVer
 export type OrbitscarValidation = { ok: boolean; errors: string[] };
 
 const MAX_BATTLE_UNITS = 100;
+export const MAX_BATTLE_DURATION_TICKS = 2400;
 
 type BattleUnit = { id: string; unitId: string; tags: OrbitscarTargetTag[]; counters: string[]; targetPriority: OrbitscarTargetPriority[]; maxHealth: number; health: number; power: number; bonusDamageVsDefenses: number; range: number; speed: number; cadence: number; position: OrbitscarPosition; nextAttackTick: number; status: "reserve" | "active" | "destroyed" | "retreated"; forcedTargetId?: string; route?: { targetId: string; topologyVersion: number; waypoints: OrbitscarPosition[]; index: number }; boostedUntil: number; overchargedUntil: number };
 type BattleStructure = { id: string; buildingId: string; defenseId?: string; tags: OrbitscarTargetTag[]; health: number; maxHealth: number; position: OrbitscarPosition; weapon?: { range: number; damage: number; cadence: number; splashRadius: number; splashDamageMultiplier: number; splashTargetTags: OrbitscarTargetTag[]; splashWeaknessBonus: boolean; targetPriority: OrbitscarTargetPriority[]; nextAttackTick: number; lockedTargetId?: string } };
@@ -122,7 +123,7 @@ export function validateOrbitscarInput(input: OrbitscarBattleInput): OrbitscarVa
   if (input.canonicalFormatVersion !== CANONICAL_FORMAT_VERSION) errors.push(`canonicalFormatVersion must be ${CANONICAL_FORMAT_VERSION}`);
   if (!input.rulesetVersion || input.rulesetVersion !== content.rulesetVersion) errors.push("rulesetVersion must match loaded content");
   if (!isInteger(input.seed) || input.seed < 0 || input.seed > 0xffffffff) errors.push("seed must be an unsigned integer");
-  if (!isInteger(input.maxDurationTicks) || input.maxDurationTicks <= 0) errors.push("maxDurationTicks must be a positive integer");
+  if (!isInteger(input.maxDurationTicks) || input.maxDurationTicks <= 0) errors.push("maxDurationTicks must be a positive integer"); else if (input.maxDurationTicks > MAX_BATTLE_DURATION_TICKS) errors.push(`maxDurationTicks must be at most ${MAX_BATTLE_DURATION_TICKS}`);
   if (!isInteger(input.deploymentCapacity) || input.deploymentCapacity < 0) errors.push("deploymentCapacity must be a non-negative integer");
   if (!isInteger(input.maxDeploymentCharges) || input.maxDeploymentCharges < 0) errors.push("maxDeploymentCharges must be a non-negative integer");
   if (!Number.isFinite(input.arena.width) || !Number.isFinite(input.arena.height) || input.arena.width <= 0 || input.arena.height <= 0) errors.push("arena dimensions must be positive finite numbers");
