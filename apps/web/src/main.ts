@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbitscar/content";
-import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, commandTierOf, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, sectorRewardPreview, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, beginColonySortie, buildColonyRaidInput, collectColonyProduction, commandTierOf, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, sectorRewardPreview, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
@@ -101,10 +101,10 @@ function stageWave(): void {
   refresh();
 }
 
-function createBattleInput(): OrbitscarBattleInput {
+function createBattleInput(seed: number): OrbitscarBattleInput {
   const firstWave = session.plan.waves[0];
   const commands: OrbitscarBattleInput["commands"] = firstWave ? [{ commandId: "wave-1", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: firstWave.zone, position: { ...zonePositions[firstWave.zone] }, units: firstWave.units } }] : [];
-  return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed: 101 + selectedTarget.id.length, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: colony.commanderId, attackerDoctrineId: colony.doctrineId, rewardPreview: sectorRewardPreview(colony, selectedTarget.id, content), army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
+  return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: colony.commanderId, attackerDoctrineId: colony.doctrineId, rewardPreview: sectorRewardPreview(colony, selectedTarget.id, content), army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
 }
 
 function activeBattleTick(replay: NonNullable<GameSession["replay"]>): number {
@@ -180,12 +180,15 @@ function resolveBattle(): void {
   if (session.plan.waves.length === 0) { setNotice("Deploy at least one wave before resolving."); return; }
   try {
     const firstWave = session.plan.waves[0];
-    const input = createBattleInput();
+    const sortie = beginColonySortie(colony, selectedTarget.id);
+    colony = sortie.colony;
+    const input = createBattleInput(sortie.seed);
     const result = resolveOrbitscarBattle(input);
     const waves = firstWave ? [firstWave] : [];
     const waveDraft = Object.fromEntries(Object.entries(session.plan.selectedArmy).map(([unitId, count]) => [unitId, Math.max(0, count - countStaged(waves, unitId))]));
     session = { ...session, plan: { ...session.plan, waves, waveDraft } };
     session = startBattle(session, { input, result, attemptId: newAttemptId(), startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0 });
+    persistColony(colony, `Sortie ${colony.sortieCount} launched with a fresh deterministic seed.`);
     persistActiveBattle();
     selectedCommanderTargetId = undefined;
     lastUiReplayTick = -1;

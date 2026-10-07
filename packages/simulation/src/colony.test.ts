@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, collectColonyProduction, commandTierOf, createColony, parseColonySave, placeColonyBuilding, recordColonyScout, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { applyBattleResult, advanceColony, beginColonySortie, collectColonyProduction, commandTierOf, createColony, parseColonySave, placeColonyBuilding, recordColonyScout, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { claimSectorNode } from "./sector.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
 import { authoritativeDigest } from "./hash.js";
@@ -11,6 +11,18 @@ const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/
 const fixture = JSON.parse(readFileSync(resolve("fixtures/battle_fixture.json"), "utf8"));
 
 describe("Orbitscar persistent colony loop", () => {
+  it("allocates distinct reproducible seeds by target and persisted sortie sequence", () => {
+    const initial = createColony("test-player", content);
+    const first = beginColonySortie(initial, "cinder-yard");
+    const next = beginColonySortie(first.colony, "cinder-yard");
+    const otherTarget = beginColonySortie(first.colony, "drift-lode");
+    expect(first.seed).toBe(beginColonySortie(initial, "cinder-yard").seed);
+    expect(first.seed).not.toBe(next.seed);
+    expect(first.seed).not.toBe(otherTarget.seed);
+    expect(next.colony.sortieCount).toBe(2);
+    expect(parseColonySave(serializeColony(next.colony)).sortieCount).toBe(2);
+  });
+
   it("creates a bounded colony, spends declarative costs, and produces extractor income", () => {
     const initial = createColony("test-player", content);
     const starter = trainUnits(initial, "line_rigger", 3, content);
@@ -55,9 +67,21 @@ describe("Orbitscar persistent colony loop", () => {
     const v3Payload = { ...oldPayload, schemaVersion: 3 };
     const legacySave = JSON.stringify({ schemaVersion: 3, payload: v3Payload, checksum: authoritativeDigest(v3Payload) });
     const migrated = parseColonySave(legacySave);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated.productionUpdatedAt).toBe(initial.updatedAt);
     expect(migrated.sector.securedNodeIds).toEqual([]);
+    expect(migrated.sortieCount).toBe(0);
+  });
+
+  it("migrates a v8 colony by initializing its sortie sequence", () => {
+    const initial = createColony("test-player", content);
+    const { sortieCount: _removed, ...legacyPayload } = initial;
+    const v8Payload = { ...legacyPayload, schemaVersion: 8 };
+    const legacySave = JSON.stringify({ schemaVersion: 8, payload: v8Payload, checksum: authoritativeDigest(v8Payload) });
+    const migrated = parseColonySave(legacySave);
+    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.sortieCount).toBe(0);
+    expect(parseColonySave(serializeColony(migrated)).sortieCount).toBe(0);
   });
 
   it("persists commander selection and migrates legacy saves to Mara", () => {

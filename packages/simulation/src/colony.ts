@@ -3,13 +3,13 @@ import type { OrbitscarContent, OrbitscarResourceBundle } from "@orbitscar/conte
 import { authoritativeDigest, canonicalSerialize } from "./hash.js";
 import { claimSectorNode, getSectorNodeState, SECTOR_NODES } from "./sector.js";
 
-export const COLONY_SCHEMA_VERSION = 8;
+export const COLONY_SCHEMA_VERSION = 9;
 export const MAX_ECONOMY_CATCHUP_MS = 4 * 60 * 60 * 1000;
 export const RESOURCE_CAPS: Readonly<Record<string, number>> = { alloy: 600, volatile: 300, signal: 240 };
 export type ColonyBuilding = { id: string; buildingId: string; position: OrbitscarPosition; level: number; health: number };
 export type ColonyReport = { id: string; attemptId: string; createdAt: string; kind: "attack" | "defense"; sectorNodeId?: string; input?: OrbitscarBattleInput; result: OrbitscarBattleResult };
 export const MAX_COLONY_REPORTS = 50;
-export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; doctrineId: string; commanderId: string; scoutedTargets: string[]; completedObjectives: string[]; sector: { securedNodeIds: string[]; securedRivalNodeIds: string[] }; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
+export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; doctrineId: string; commanderId: string; sortieCount: number; scoutedTargets: string[]; completedObjectives: string[]; sector: { securedNodeIds: string[]; securedRivalNodeIds: string[] }; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
 export type ColonySave = { schemaVersion: number; payload: ColonyState; checksum: string };
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
@@ -21,7 +21,18 @@ function overlap(a: ColonyBuilding, b: ColonyBuilding, content: OrbitscarContent
 
 export function createColony(playerId: string, content: OrbitscarContent): ColonyState {
   const timestamp = now();
-  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], doctrineId: "none", commanderId: "mara_voss", scoutedTargets: [], completedObjectives: [], sector: { securedNodeIds: [], securedRivalNodeIds: [] }, reports: [], settings: { muted: false, reducedMotion: false } };
+  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], doctrineId: "none", commanderId: "mara_voss", sortieCount: 0, scoutedTargets: [], completedObjectives: [], sector: { securedNodeIds: [], securedRivalNodeIds: [] }, reports: [], settings: { muted: false, reducedMotion: false } };
+}
+
+export function beginColonySortie(state: ColonyState, targetId: string): { colony: ColonyState; seed: number } {
+  if (targetId.trim().length === 0) throw new Error("sortie target must be a non-empty string");
+  if (!Number.isSafeInteger(state.sortieCount) || state.sortieCount < 0 || state.sortieCount >= Number.MAX_SAFE_INTEGER) throw new Error("sortie sequence is invalid or exhausted");
+  const colony = clone(state);
+  colony.sortieCount += 1;
+  let hash = 2166136261;
+  for (const character of `${state.playerId}\u0000${colony.sortieCount}\u0000${targetId}`) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  colony.updatedAt = now();
+  return { colony, seed: hash >>> 0 };
 }
 
 function markObjective(state: ColonyState, objectiveId: string): void { if (!state.completedObjectives.includes(objectiveId)) state.completedObjectives.push(objectiveId); }
@@ -214,7 +225,7 @@ export function parseColonySave(serialized: string): ColonyState {
   try { parsed = JSON.parse(serialized); } catch { throw new Error("colony save is not valid JSON"); }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("colony save must be an object");
   const save = parsed as Partial<ColonySave>;
-  if (save.payload === undefined || typeof save.checksum !== "string" || ![1, 2, 3, 4, 5, 6, 7, COLONY_SCHEMA_VERSION].includes(save.schemaVersion ?? -1)) throw new Error("unsupported colony save schema");
+  if (save.payload === undefined || typeof save.checksum !== "string" || ![1, 2, 3, 4, 5, 6, 7, 8, COLONY_SCHEMA_VERSION].includes(save.schemaVersion ?? -1)) throw new Error("unsupported colony save schema");
   if (authoritativeDigest(save.payload) !== save.checksum) throw new Error("colony save checksum mismatch");
   const payload = clone(save.payload);
   if (!Array.isArray(payload.buildings)) throw new Error("colony save contains malformed buildings");
@@ -251,6 +262,8 @@ export function parseColonySave(serialized: string): ColonyState {
     }
   }
   payload.settings = payload.settings ?? { muted: false, reducedMotion: false };
+  payload.sortieCount = payload.sortieCount ?? 0;
+  if (!Number.isSafeInteger(payload.sortieCount) || payload.sortieCount < 0) throw new Error("colony save contains malformed sortie sequence");
   payload.productionUpdatedAt = payload.productionUpdatedAt ?? payload.updatedAt ?? payload.createdAt;
   payload.reports = (payload.reports ?? []).map((report, index) => ({ ...report, kind: report.kind ?? "attack", attemptId: report.attemptId ?? report.id ?? `legacy-attempt-${index + 1}` }));
   return payload;
