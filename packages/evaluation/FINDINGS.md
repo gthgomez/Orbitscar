@@ -142,7 +142,7 @@ Identical seeds reproduce these results byte-for-byte (deterministic resolver).
 
 ## Historical ruleset 0.2.0 snapshot — superseded
 
-These campaign answers describe the early baseline and are retained for context. Current balance evidence is the ruleset 0.7.0 evaluation below and the campaign status file.
+These campaign answers describe the early baseline and are retained for context. Current balance evidence is the latest ruleset section below and the campaign status file.
 
 ## Approach geography and footprint cleanup — ruleset 0.7.0
 
@@ -175,6 +175,48 @@ deployment: immediate-mass 76.6%, probe-reinforce 66.7%, half-half 58.4%, and
 three waves 49.4%. This iteration improves map-side choice without solving
 composition or timing balance. Deterministic corpus results are not human fun
 or readability evidence.
+
+## Defensive target lock and tactical acquisition — ruleset 0.8.0
+
+Defenses now emit deterministic target-acquisition and lock-loss events and
+retain a valid target through firing. Initial contact keeps its scheduled shot;
+acquiring a new target does not restart a weapon's cadence. A target acquired
+while the weapon reloads creates a visible remaining-cooldown window for a
+reinforcement or commander decision. The Phaser scene draws active target lines,
+the accessible battle HUD announces them, and reports pair each shot with the
+latest uninterrupted acquisition. A regression test covers lock loss and
+reacquisition. A first implementation restarted a full cadence on every
+acquisition; it failed the existing 15-point approach-balance gate, so that
+behavior was discarded rather than relaxing the gate.
+
+The corrected 4,928-run corpus completed with zero invariant violations and
+4,400 unique outcome hashes. Approach win rates were west 59.0%, north 59.3%,
+south 65.3%, east 64.9% (6.3-point spread). Composition win rates were
+air-harass 82.4%, screen-line 71.9%, anti-armor-punch 75.4%, ranged-fortress
+64.6%, skirmish-mix 51.8%, sabotage-strike 51.8%, and salvage-raid 36.9%.
+Timing remained tilted: immediate-mass 76.0%, probe-then-reinforce 67.4%,
+half-half 57.6%, and three waves 47.6%. All always-on acceptance gates pass;
+air-harass is still too strong and long fixed delays still underperform.
+
+A separate paired adaptive-policy probe covered 616 no-ability battles (11
+encounters × 7 compositions × 4 opening approaches × 2 seeds). It deployed a
+quarter-force probe, observed the first acquisition that had a later shot, then
+sent the remaining force from the opposite approach on the next tick. The
+reactive plan won 70.1%, compared with 67.9% for immediate mass and 61.4% for a
+fixed tick-600 split. Reactive runs had 13.8% full breaches versus 10.6% for
+immediate mass and 14.9% for fixed staging; average casualties were 3.51 versus
+3.29 and 3.96, while alloy salvage was 15.7 versus 13.7 and 15.2. In paired
+cases reactive deployment improved victory tier in 66/616 and worsened it in
+44/616, with another 124 ties at lower casualties. This is a risk/reward
+tradeoff visible in the recorded outcomes, not proof of an overall dominant
+adaptive policy or human fun.
+
+The counter diagnostic found the Snare Lattice fired before it was suppressed
+in 60/64 adaptive air-harass cases, with 4.08 of 9 drones lost on average. Its
+counter is visible but does not prevent air-harass from leading the corpus.
+Further anti-air balance work should use this evidence and preserve the
+specialist's actual counter interaction. No human readability or fun claim is
+made.
 
 **Multiple viable approaches — YES.** Against the introductory target
 (cinder-yard), at least three archetypes win reliably: screen-line (100%),

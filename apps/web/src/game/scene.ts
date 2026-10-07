@@ -32,6 +32,7 @@ export class OrbitscarScene extends Phaser.Scene {
   private lastBattleDrawAt = 0;
   private units = new Map<string, { position: OrbitscarPosition; health: number; alive: boolean }>();
   private structureHealth = new Map<string, number>();
+  private defenseLocks = new Map<string, string>();
   private artSprites = new Map<string, Phaser.GameObjects.Image>();
   constructor(bridge: SceneBridge) { super("OrbitscarScene"); this.bridge = bridge; }
   preload(): void { for (const [key, path] of Object.entries(ART_PATHS)) this.load.svg(key, path); }
@@ -53,7 +54,7 @@ export class OrbitscarScene extends Phaser.Scene {
   private updateCameraZoom(): void { if (this.cameras.main) this.cameras.main.setZoom(Phaser.Math.Clamp(Math.min(this.scale.width / ARENA.width, this.scale.height / ARENA.height), .55, 1.5)); }
   private colonyClick(point: OrbitscarPosition): void { const buildMode = this.bridge.getBuildMode(); if (buildMode) { this.bridge.placeBuilding({ x: Math.round((point.x - 20) / GRID) * GRID, y: Math.round((point.y - 20) / GRID) * GRID }); return; } const colony = this.bridge.getColony(); const hit = [...colony.buildings].reverse().find((building) => { const footprint = this.bridge.content.buildings[building.buildingId].footprint; return point.x >= building.position.x && point.x <= building.position.x + footprint[0] * GRID && point.y >= building.position.y && point.y <= building.position.y + footprint[1] * GRID; }); this.bridge.selectBuilding(hit?.id); }
   private battleClick(point: OrbitscarPosition): void { const hit = (Object.entries(zonePositions) as [Zone, OrbitscarPosition][]).find(([, position]) => Math.abs(point.x - position.x) < 80 && Math.abs(point.y - position.y) < 80); if (hit) this.bridge.selectZone(hit[0]); }
-  private applyEvents(events: OrbitscarBattleEvent[], replay: ReplayState): void { this.units.clear(); this.structureHealth.clear(); for (const structure of replay.input.structures) this.structureHealth.set(structure.id, structure.currentHealth ?? this.bridge.content.buildings[structure.buildingId].maxHealth); for (const event of events) { if (event.entityId?.includes("#")) { const unitId = event.entityId.split("#")[0]; const unit = this.units.get(event.entityId) ?? { position: event.position ?? { x: 0, y: 0 }, health: this.bridge.content.units[unitId].health, alive: true }; if (event.position) unit.position = { ...event.position }; if (event.remainingHealth !== undefined) unit.health = event.remainingHealth; if (event.type === "unit_destroyed") unit.alive = false; this.units.set(event.entityId, unit); } else if (event.entityId && event.remainingHealth !== undefined) this.structureHealth.set(event.entityId, event.remainingHealth); } }
+  private applyEvents(events: OrbitscarBattleEvent[], replay: ReplayState): void { this.units.clear(); this.structureHealth.clear(); this.defenseLocks.clear(); for (const structure of replay.input.structures) this.structureHealth.set(structure.id, structure.currentHealth ?? this.bridge.content.buildings[structure.buildingId].maxHealth); for (const event of events) { if (event.type === "defense_aimed" && event.entityId && event.targetId) this.defenseLocks.set(event.entityId, event.targetId); if ((event.type === "defense_lock_lost" || event.type === "defense_destroyed") && event.entityId) this.defenseLocks.delete(event.entityId); if (event.type === "unit_destroyed" && event.entityId) for (const [defenseId, targetId] of this.defenseLocks) if (targetId === event.entityId) this.defenseLocks.delete(defenseId); if (event.entityId?.includes("#")) { const unitId = event.entityId.split("#")[0]; const unit = this.units.get(event.entityId) ?? { position: event.position ?? { x: 0, y: 0 }, health: this.bridge.content.units[unitId].health, alive: true }; if (event.position) unit.position = { ...event.position }; if (event.remainingHealth !== undefined) unit.health = event.remainingHealth; if (event.type === "unit_destroyed") unit.alive = false; this.units.set(event.entityId, unit); } else if (event.entityId && event.remainingHealth !== undefined) this.structureHealth.set(event.entityId, event.remainingHealth); } }
   private draw(): void { if (!this.world) return; for (const sprite of this.artSprites.values()) sprite.setVisible(false); this.world.clear(); this.world.fillStyle(0x09151c, 1).fillRect(0, 0, ARENA.width, ARENA.height); this.world.lineStyle(1, 0x17323c, 1); for (let x = 0; x <= ARENA.width; x += GRID) this.world.lineBetween(x, 0, x, ARENA.height); for (let y = 0; y <= ARENA.height; y += GRID) this.world.lineBetween(0, y, ARENA.width, y); if (this.bridge.getMode() === "colony") this.drawColony(); else this.drawBattle(); }
   private drawArtSprite(instanceId: string, textureKey: string, x: number, y: number, width: number, height: number, alpha = 1): void {
     if (!this.textures.exists(textureKey)) return;
@@ -109,6 +110,16 @@ export class OrbitscarScene extends Phaser.Scene {
         const textureKey = ART_TEXTURES[unitId];
         if (textureKey) this.drawArtSprite(`unit:${id}`, textureKey, unit.position.x, unit.position.y, 28, 28);
         else this.drawUnitSilhouette(unitId, unit.position);
+      }
+      for (const [defenseId, targetId] of this.defenseLocks) {
+        const structure = structures.find((entry) => entry.id === defenseId);
+        const target = this.units.get(targetId);
+        if (!structure || !target?.alive) continue;
+        const definition = this.bridge.content.buildings[structure.buildingId];
+        const x = structure.position.x + definition.footprint[0] * GRID / 2;
+        const y = structure.position.y + definition.footprint[1] * GRID / 2;
+        this.world.lineStyle(2, 0xffb45f, .9).lineBetween(x, y, target.position.x, target.position.y);
+        this.world.fillStyle(0xffb45f, .95).fillCircle(target.position.x, target.position.y, 5);
       }
     }
   }

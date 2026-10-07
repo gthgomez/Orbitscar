@@ -36,6 +36,27 @@ function result(events: OrbitscarBattleResult["events"]): OrbitscarBattleResult 
 }
 
 describe("battle report analysis", () => {
+  it("records a reinforcement arriving during a defense wind-up", () => {
+    const report = analyzeBattleReport(result([
+      { sequence: 1, tick: 0, type: "defense_aimed", entityId: "arc", targetId: "line_rigger#1" },
+      { sequence: 2, tick: 8, type: "deployed", entityId: "needle_drone#1" },
+      { sequence: 3, tick: 24, type: "defense_fired", entityId: "arc", targetId: "line_rigger#1", value: 12 },
+    ]), "attack", target, content);
+    expect(report.recordedFacts.join(" ")).toContain("acquired Line Rigger at tick 0 and first hit at tick 24; a reinforcement arrived during that wind-up at tick 8");
+  });
+
+  it("starts report wind-up timing again after a defense loses and reacquires its target", () => {
+    const report = analyzeBattleReport(result([
+      { sequence: 1, tick: 0, type: "defense_aimed", entityId: "arc", targetId: "line_rigger#1" },
+      { sequence: 2, tick: 5, type: "defense_lock_lost", entityId: "arc", targetId: "line_rigger#1" },
+      { sequence: 3, tick: 8, type: "defense_aimed", entityId: "arc", targetId: "line_rigger#1" },
+      { sequence: 4, tick: 26, type: "defense_fired", entityId: "arc", targetId: "line_rigger#1", value: 12 },
+    ]), "attack", target, content);
+    const fact = report.recordedFacts.find((entry) => entry.includes("acquired Line Rigger"));
+    expect(fact).toContain("at tick 8 and first hit at tick 26");
+    expect(fact).not.toContain("at tick 0");
+  });
+
   it("attributes damage, kills, deployments, and commander actions to recorded events", () => {
     const report = analyzeBattleReport(result([
       { sequence: 1, tick: 0, type: "deployed", entityId: "line_rigger#1" },

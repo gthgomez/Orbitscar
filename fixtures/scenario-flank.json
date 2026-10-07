@@ -1,5 +1,5 @@
 {
-  "canonicalFormatVersion": 2, "rulesetVersion": "0.7.0", "seed": 17, "maxDurationTicks": 2400,
+  "canonicalFormatVersion": 2, "rulesetVersion": "0.8.0", "seed": 17, "maxDurationTicks": 2400,
   "arena": { "width": 1200, "height": 800 }, "deploymentCapacity": 10, "maxDeploymentCharges": 3, "commanderId": "mara_voss",
   "army": [{ "unitId": "line_rigger", "count": 3 }, { "unitId": "pulse_marksman", "count": 2 }, { "unitId": "ram_walker", "count": 2 }, { "unitId": "needle_drone", "count": 1 }],
   "structures": [{ "id": "relay", "buildingId": "command_relay", "position": { "x": 930, "y": 400 } }, { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 240 } }, { "id": "cradle", "buildingId": "drop_cradle", "position": { "x": 760, "y": 560 } }, { "id": "arc", "buildingId": "arc_projector", "position": { "x": 640, "y": 300 } }, { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 690, "y": 520 } }, { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 830, "y": 400 } }],

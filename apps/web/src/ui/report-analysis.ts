@@ -84,6 +84,18 @@ export function analyzeBattleReport(
 
     const firstContact = result.events.find((event) => event.type === "defense_fired");
     if (firstContact?.entityId) facts.push(`${entityName(firstContact.entityId, target, content)} opened fire at tick ${firstContact.tick}.`);
+    let acquisition: typeof result.events[number] | undefined;
+    let firstShot: typeof result.events[number] | undefined;
+    for (const event of result.events) {
+      if (event.type === "defense_aimed" && event.entityId && event.targetId) { acquisition = event; continue; }
+      if (!acquisition || event.entityId !== acquisition.entityId || event.targetId !== acquisition.targetId) continue;
+      if (event.type === "defense_lock_lost") acquisition = undefined;
+      if (event.type === "defense_fired") { firstShot = event; break; }
+    }
+    if (acquisition?.entityId && acquisition.targetId && firstShot) {
+      const reinforcement = result.events.find((event) => event.type === "deployed" && event.tick > acquisition!.tick && event.tick <= firstShot!.tick);
+      facts.push(`${entityName(acquisition.entityId, target, content)} acquired ${friendlyName(acquisition.targetId)} at tick ${acquisition.tick} and first hit at tick ${firstShot.tick}${reinforcement ? `; a reinforcement arrived during that wind-up at tick ${reinforcement.tick}` : ""}.`);
+    }
     if (result.retreated) facts.push("The force retreated; surviving units remain available for another sortie.");
     else {
       const casualties = Object.values(result.attackerCasualties).reduce((sum, count) => sum + count, 0);

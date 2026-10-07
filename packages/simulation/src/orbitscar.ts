@@ -14,7 +14,7 @@ export type OrbitscarCommand =
   | { commandId: string; sequence: number; tick: number; type: "COMMANDER_ABILITY"; payload: OrbitscarAbilityPayload }
   | { commandId: string; sequence: number; tick: number; type: "RETREAT"; payload: Record<string, never> };
 export type OrbitscarBattleInput = { canonicalFormatVersion: number; rulesetVersion: string; seed: number; maxDurationTicks: number; arena: OrbitscarArena; deploymentCapacity: number; maxDeploymentCharges: number; commanderId: string; attackerDoctrineId?: string; defenderDoctrineId?: string; army: OrbitscarArmyEntry[]; structures: OrbitscarStructurePlacement[]; commands: OrbitscarCommand[]; rewardPreview: Record<string, number>; content: OrbitscarContent };
-export type OrbitscarBattleEvent = { sequence: number; tick: number; type: "battle_started" | "deployed" | "ability" | "unit_moved" | "unit_attacked" | "unit_damaged" | "unit_destroyed" | "defense_fired" | "defense_damaged" | "defense_destroyed" | "battle_ended"; entityId?: string; targetId?: string; value?: number; remainingHealth?: number; position?: OrbitscarPosition };
+export type OrbitscarBattleEvent = { sequence: number; tick: number; type: "battle_started" | "deployed" | "ability" | "unit_moved" | "unit_attacked" | "unit_damaged" | "unit_destroyed" | "defense_aimed" | "defense_lock_lost" | "defense_fired" | "defense_damaged" | "defense_destroyed" | "battle_ended"; entityId?: string; targetId?: string; value?: number; remainingHealth?: number; position?: OrbitscarPosition };
 export type OrbitscarDeploymentUsage = { commandId: string; tick: number; capacityUsed: number; units: OrbitscarArmyEntry[] };
 export type OrbitscarBattleResult = { canonicalFormatVersion: number; rulesetVersion: string; seed: number; winner: "attacker" | "defender" | "draw"; victoryTier: "full" | "partial" | "defeat"; retreated: boolean; durationTicks: number; attackerCasualties: Record<string, number>; survivingUnits: Record<string, number>; destroyedStructureIds: string[]; loot: Record<string, number>; damageByEntity: Record<string, number>; deploymentUsage: OrbitscarDeploymentUsage[]; commanderUse: { commanderId: string; abilityId: string; count: number }; eventCount: number; events: OrbitscarBattleEvent[]; baseSnapshotHash: string; armySnapshotHash: string; canonicalHash: string; outcomeHash: string };
 export type OrbitscarValidation = { ok: boolean; errors: string[] };
@@ -22,7 +22,7 @@ export type OrbitscarValidation = { ok: boolean; errors: string[] };
 const MAX_BATTLE_UNITS = 100;
 
 type BattleUnit = { id: string; unitId: string; tags: OrbitscarTargetTag[]; counters: string[]; targetPriority: OrbitscarTargetPriority[]; maxHealth: number; health: number; power: number; bonusDamageVsDefenses: number; range: number; speed: number; cadence: number; position: OrbitscarPosition; nextAttackTick: number; status: "reserve" | "active" | "destroyed" | "retreated"; forcedTargetId?: string; route?: { targetId: string; topologyVersion: number; waypoints: OrbitscarPosition[]; index: number }; boostedUntil: number; overchargedUntil: number };
-type BattleStructure = { id: string; buildingId: string; defenseId?: string; tags: OrbitscarTargetTag[]; health: number; maxHealth: number; position: OrbitscarPosition; weapon?: { range: number; damage: number; cadence: number; splashRadius: number; splashDamageMultiplier: number; targetPriority: OrbitscarTargetPriority[]; nextAttackTick: number } };
+type BattleStructure = { id: string; buildingId: string; defenseId?: string; tags: OrbitscarTargetTag[]; health: number; maxHealth: number; position: OrbitscarPosition; weapon?: { range: number; damage: number; cadence: number; splashRadius: number; splashDamageMultiplier: number; targetPriority: OrbitscarTargetPriority[]; nextAttackTick: number; lockedTargetId?: string } };
 
 const COUNTER_DAMAGE_MULTIPLIER = 1.4;
 
@@ -216,9 +216,23 @@ export function resolveOrbitscarBattle(input: OrbitscarBattleInput): OrbitscarBa
     if (battleEnded) break; if (!coreAlive() || (units.length > 0 && activeUnits().length === 0 && commandIndex >= canonical.commands.length && !(units.some((unit) => unit.status === "reserve") && deploymentUsage.length < canonical.maxDeploymentCharges))) { battleEnded = true; break; }
     for (const structure of structures.filter((candidate) => candidate.weapon && candidate.health > 0)) {
       const weapon = structure.weapon;
-      if (!weapon || tick < weapon.nextAttackTick) continue;
-      const target = chooseUnit(structure, units);
-      if (!target || distanceSquared(structure.position, target.position) > weapon.range * weapon.range) continue;
+      if (!weapon) continue;
+      let target = weapon.lockedTargetId === undefined ? undefined : units.find((unit) => unit.id === weapon.lockedTargetId && unit.status === "active" && unit.health > 0);
+      if (target && distanceSquared(structure.position, target.position) > weapon.range * weapon.range) {
+        pushEvent({ tick, type: "defense_lock_lost", entityId: structure.id, targetId: target.id });
+        weapon.lockedTargetId = undefined;
+        target = undefined;
+      } else if (!target && weapon.lockedTargetId !== undefined) {
+        pushEvent({ tick, type: "defense_lock_lost", entityId: structure.id, targetId: weapon.lockedTargetId });
+        weapon.lockedTargetId = undefined;
+      }
+      if (!target) {
+        target = chooseUnit(structure, units);
+        if (!target || distanceSquared(structure.position, target.position) > weapon.range * weapon.range) continue;
+        weapon.lockedTargetId = target.id;
+        pushEvent({ tick, type: "defense_aimed", entityId: structure.id, targetId: target.id, position: { ...target.position } });
+      }
+      if (tick < weapon.nextAttackTick) continue;
       weapon.nextAttackTick = tick + weapon.cadence;
       const roll = nextRandom(randomSeed); randomSeed = roll.seed;
       const baseDamage = Math.max(1, Math.floor(weapon.damage * (0.9 + roll.value * 0.2)));

@@ -87,10 +87,10 @@ describe("Orbitscar deterministic spatial combat", () => {
   it("applies a defensive weakness multiplier to secondary splash victims", () => {
     const deploy = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } };
     const structures = [{ id: "weapon", buildingId: "scatter_coil", position: { x: 220, y: 400 } }, { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } }];
-    const weakResult = resolveOrbitscarBattle(inputWith([deploy], { army: [{ unitId: "line_rigger", count: 4 }], structures, maxDurationTicks: 1 }));
+    const weakResult = resolveOrbitscarBattle(inputWith([deploy], { army: [{ unitId: "line_rigger", count: 4 }], structures, maxDurationTicks: 19 }));
     const plainContent = structuredClone(content);
     plainContent.units.line_rigger.counters = [];
-    const plainResult = resolveOrbitscarBattle(inputWith([deploy], { army: [{ unitId: "line_rigger", count: 4 }], structures, content: plainContent, maxDurationTicks: 1 }));
+    const plainResult = resolveOrbitscarBattle(inputWith([deploy], { army: [{ unitId: "line_rigger", count: 4 }], structures, content: plainContent, maxDurationTicks: 19 }));
     const weakHits = weakResult.events.filter((event) => event.type === "unit_damaged" && event.targetId === "weapon");
     const plainHits = plainResult.events.filter((event) => event.type === "unit_damaged" && event.targetId === "weapon");
     const splashVictim = weakHits.find((event) => event.entityId !== weakHits[0]?.entityId);
@@ -131,6 +131,42 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(() => appendOrbitscarCommand(initial, { ...reinforcement, tick: 60 }, 60)).toThrow("stale");
     expect(() => appendOrbitscarCommand(initial, { ...reinforcement, sequence: 1 }, 90)).toThrow("sequence");
     expect(() => appendOrbitscarCommand(initial, { ...reinforcement, tick: 150 }, 90)).toThrow("ahead");
+  });
+
+  it("telegraphs a defense target and holds that target through its first shot", () => {
+    const input = inputWith([
+      { commandId: "probe", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 150, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } },
+      { commandId: "reinforcement", sequence: 2, tick: 5, type: "DEPLOY", payload: { zone: "west", position: { x: 330, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } },
+    ], {
+      army: [{ unitId: "line_rigger", count: 2 }],
+      structures: [{ id: "relay", buildingId: "command_relay", position: { x: 1000, y: 360 } }, { id: "arc", buildingId: "arc_projector", position: { x: 400, y: 360 } }],
+      maxDurationTicks: 30,
+    });
+    const result = resolveOrbitscarBattle(input);
+    const aimed = result.events.find((event) => event.type === "defense_aimed" && event.entityId === "arc");
+    const fired = result.events.find((event) => event.type === "defense_fired" && event.entityId === "arc");
+    expect(aimed).toMatchObject({ tick: 0, targetId: "line_rigger#0" });
+    expect(fired).toMatchObject({ tick: 0, targetId: "line_rigger#0" });
+    expect(result.events.some((event) => event.type === "defense_fired" && event.entityId === "arc" && event.targetId === "line_rigger#0" && event.tick === 24)).toBe(true);
+    expect(resolveOrbitscarBattle(input).outcomeHash).toBe(result.outcomeHash);
+  });
+
+  it("retargets safely after a locked unit is destroyed without resetting weapon cadence", () => {
+    const pressuredContent = JSON.parse(JSON.stringify(content));
+    pressuredContent.defenses.arc_projector.damage = 1000;
+    const result = resolveOrbitscarBattle(inputWith([
+      { commandId: "probe", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 150, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } },
+      { commandId: "reinforcement", sequence: 2, tick: 5, type: "DEPLOY", payload: { zone: "west", position: { x: 330, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } },
+    ], {
+      army: [{ unitId: "line_rigger", count: 2 }],
+      structures: [{ id: "relay", buildingId: "command_relay", position: { x: 1000, y: 360 } }, { id: "arc", buildingId: "arc_projector", position: { x: 400, y: 360 } }],
+      content: pressuredContent,
+      maxDurationTicks: 55,
+    }));
+    const acquisitions = result.events.filter((event) => event.type === "defense_aimed" && event.entityId === "arc");
+    expect(result.events.some((event) => event.type === "unit_destroyed" && event.entityId === "line_rigger#0" && event.tick === 0)).toBe(true);
+    expect(acquisitions.map((event) => [event.tick, event.targetId])).toEqual([[0, "line_rigger#0"], [5, "line_rigger#1"]]);
+    expect(result.events.some((event) => event.type === "defense_fired" && event.entityId === "arc" && event.targetId === "line_rigger#1" && event.tick === 24)).toBe(true);
   });
 
   it("keeps the battle open for legal reinforcements while selected reserves remain", () => {
