@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbitscar/content";
-import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, placeColonyBuilding, repairColonyBuilding, resolveOrbitscarBattle, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, placeColonyBuilding, repairColonyBuilding, resolveOrbitscarBattle, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
@@ -102,7 +102,7 @@ function stageWave(): void {
 function createBattleInput(): OrbitscarBattleInput {
   const firstWave = session.plan.waves[0];
   const commands: OrbitscarBattleInput["commands"] = firstWave ? [{ commandId: "wave-1", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: firstWave.zone, position: { ...zonePositions[firstWave.zone] }, units: firstWave.units } }] : [];
-  return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed: 101 + selectedTarget.id.length, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: "mara_voss", rewardPreview: { ...selectedTarget.rewardPreview }, army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
+  return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed: 101 + selectedTarget.id.length, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: colony.commanderId, rewardPreview: { ...selectedTarget.rewardPreview }, army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
 }
 
 function activeBattleTick(replay: NonNullable<GameSession["replay"]>): number {
@@ -218,6 +218,7 @@ function handleAction(action: string): void {
   if (action === "army") { session = beginArmyComposition(session); setMode("army"); return; }
   if (action === "collect") { colony = collectColonyProduction(colony, Date.now(), content); saveColony("Stored production collected."); return; }
   if (action === "save") { saveColony("Colony saved locally."); return; }
+  if (verb === "commander" && value) { try { colony = selectColonyCommander(colony, value, content); saveColony(`${displayName(value)} assigned to the command seat.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Commander selection failed."); } return; }
   if (verb === "replay-report" && value) {
     const report = colony.reports.find((entry) => entry.attemptId === value);
     if (!report?.input) { setNotice("This legacy report has no saved replay snapshot."); return; }

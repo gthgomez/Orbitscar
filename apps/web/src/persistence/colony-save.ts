@@ -9,7 +9,9 @@ const oldestStorageKey = "orbitscar_colony_v1";
 export function loadColony(content: OrbitscarContent): ColonyState {
   try {
     const saved = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey) ?? window.localStorage.getItem(olderStorageKey) ?? window.localStorage.getItem(oldestStorageKey);
-    return saved === null ? createColony("local-player", content) : parseColonySave(saved);
+    if (saved === null) return createColony("local-player", content);
+    const colony = parseColonySave(saved);
+    return content.commanders[colony.commanderId] ? colony : { ...colony, commanderId: "mara_voss" };
   } catch {
     return createColony("local-player", content);
   }
@@ -23,4 +25,3 @@ export function persistColony(colony: ColonyState, message: string): { message: 
     return { message: "Local save unavailable; this session is still playable." };
   }
 }
-

@@ -29,7 +29,7 @@ export function buildColonyRaidInput(colony: ColonyState, archetype: ColonyRaidA
     arena: { width: 1200, height: 800 },
     deploymentCapacity: 10,
     maxDeploymentCharges: 1,
-    commanderId: "mara_voss",
+    commanderId: colony.commanderId,
     army: army.map((entry) => ({ ...entry })),
     structures: colony.buildings.map((building) => ({ id: building.id, buildingId: building.buildingId, position: { ...building.position }, level: building.level, currentHealth: building.health })),
     commands: [{ commandId: `raid-${seed}`, sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: zones[zoneIndex], position: { ...positions[zoneIndex] }, units: army.map((entry) => ({ ...entry })) } }],

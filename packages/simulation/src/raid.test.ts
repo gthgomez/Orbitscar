@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding } from "./colony.js";
+import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding, selectColonyCommander } from "./colony.js";
 import { buildColonyRaidInput } from "./raid.js";
 import { resolveOrbitscarBattle } from "./orbitscar.js";
 
@@ -19,6 +19,13 @@ describe("colony raid loop", () => {
     expect(first.events.some((event) => event.type === "defense_fired")).toBe(true);
     const altered = { ...colony, buildings: colony.buildings.map((building) => building.id === "scatter_coil-3" ? { ...building, position: { x: 900, y: 700 } } : building) };
     expect(resolveOrbitscarBattle(buildColonyRaidInput(altered, "scavenger_swarm", 40, content)).baseSnapshotHash).not.toBe(first.baseSnapshotHash);
+  });
+
+  it("uses the colony's selected commander in deterministic defense snapshots", () => {
+    const colony = selectColonyCommander(createColony("defender", content), "ion_kade", content);
+    const input = buildColonyRaidInput(colony, "signal_harvest", 43, content);
+    expect(input.commanderId).toBe("ion_kade");
+    expect(input.commands[0].type).toBe("DEPLOY");
   });
 
   it("settles raid damage once and lets the owner repair a disabled structure", () => {
