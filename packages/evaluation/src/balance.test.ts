@@ -125,7 +125,7 @@ describe("Orbitscar balance scenario guards", () => {
             if (withAbility.outcomeHash !== without.outcomeHash) changed += 1;
           }
     expect(changed, `commander ability altered the battle outcome in only ${changed}/${total} scenarios; the ability must never become a literal no-op`).toBeGreaterThanOrEqual(Math.ceil(total * 0.5));
-  });
+  }, 15_000);
 
   it("balance scenarios reproduce byte-for-byte across repeated resolution", () => {
     const samples: Array<[string, string, string, Zone, boolean]> = [

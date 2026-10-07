@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, createColony, parseColonySave, placeColonyBuilding, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { applyBattleResult, advanceColony, collectColonyProduction, createColony, parseColonySave, placeColonyBuilding, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
+import { authoritativeDigest } from "./hash.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
 const fixture = JSON.parse(readFileSync(resolve("fixtures/battle_fixture.json"), "utf8"));
@@ -17,6 +18,42 @@ describe("Orbitscar persistent colony loop", () => {
     const advanced = advanceColony(placed, 60, content);
     expect(advanced.resources.alloy).toBeGreaterThan(placed.resources.alloy);
     expect(() => placeColonyBuilding(advanced, "arc_projector", { x: 440, y: 360 }, content)).toThrow("overlaps");
+  });
+
+  it("collects only bounded elapsed-time production and caps storage", () => {
+    const initial = createColony("test-player", content);
+    const productionStart = Date.parse(initial.productionUpdatedAt);
+    const partial = collectColonyProduction(initial, productionStart + 30_000, content);
+    expect(partial.resources).toEqual(initial.resources);
+    expect(partial.productionUpdatedAt).toBe(initial.productionUpdatedAt);
+    const afterMinute = collectColonyProduction(partial, productionStart + 60_000, content);
+    expect(afterMinute.resources.alloy - initial.resources.alloy).toBe(6);
+    expect(collectColonyProduction(afterMinute, productionStart + 60_000, content).resources).toEqual(afterMinute.resources);
+    const capped = collectColonyProduction(afterMinute, productionStart + 365 * 24 * 60 * 60 * 1000, content);
+    expect(capped.resources.alloy).toBeLessThanOrEqual(600);
+    expect(capped.resources.volatile).toBeLessThanOrEqual(300);
+    expect(capped.resources.signal).toBeLessThanOrEqual(240);
+    expect(() => collectColonyProduction(initial, productionStart - 1, content)).toThrow("clock");
+  });
+
+  it("extractor levels increase bounded production", () => {
+    const initial = createColony("test-player", content);
+    const start = Date.parse(initial.productionUpdatedAt);
+    const upgraded = upgradeColonyBuilding(initial, "matter-extractor-1", content, start + 30_000);
+    const base = collectColonyProduction(initial, start + 90_000, content);
+    const improved = collectColonyProduction(upgraded, start + 90_000, content);
+    expect(improved.resources.alloy - upgraded.resources.alloy).toBeGreaterThan(base.resources.alloy - initial.resources.alloy);
+    expect(improved.resources.volatile - upgraded.resources.volatile).toBeGreaterThan(base.resources.volatile - initial.resources.volatile);
+  });
+
+  it("migrates v3 saves without minting time or losing their previous timestamp", () => {
+    const initial = createColony("test-player", content);
+    const { productionUpdatedAt: _removed, ...oldPayload } = initial;
+    const v3Payload = { ...oldPayload, schemaVersion: 3 };
+    const legacySave = JSON.stringify({ schemaVersion: 3, payload: v3Payload, checksum: authoritativeDigest(v3Payload) });
+    const migrated = parseColonySave(legacySave);
+    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.productionUpdatedAt).toBe(initial.updatedAt);
   });
 
   it("trains persistent reserves and rejects unaffordable batches", () => {

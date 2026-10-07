@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, placeColonyBuilding, resolveOrbitscarBattle, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { applyBattleResult, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, placeColonyBuilding, repairColonyBuilding, resolveOrbitscarBattle, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
@@ -73,6 +73,23 @@ function createBattleInput(): OrbitscarBattleInput {
   return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed: 101 + selectedTarget.id.length, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: "mara_voss", rewardPreview: { ...selectedTarget.rewardPreview }, army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
 }
 
+function startColonyRaid(): void {
+  const archetypes = ["scavenger_swarm", "breach_column", "signal_harvest"] as const;
+  const raidCount = colony.reports.filter((report) => report.kind === "defense").length;
+  const archetype = archetypes[raidCount % archetypes.length];
+  const seed = raidCount + 401;
+  try {
+    const input = buildColonyRaidInput(colony, archetype, seed, content);
+    const result = resolveOrbitscarBattle(input);
+    colony = applyColonyDefenseResult(colony, input, result, `raid-${seed}`);
+    persistColony(colony, "Raid result recorded.");
+    selectedTarget = { id: "home-colony", name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures, suggestedCounters: [] };
+    session = startBattle(session, { kind: "defense", input, result, attemptId: `raid-${seed}`, startedAt: performance.now(), eventIndex: 0, done: false });
+    lastUiReplayTick = -1;
+    refresh();
+  } catch (error) { setNotice(error instanceof Error ? error.message : "Raid simulation failed."); }
+}
+
 function resolveBattle(): void {
   if (session.plan.waves.length === 0) { setNotice("Deploy at least one wave before resolving."); return; }
   try { const input = createBattleInput(); const result = resolveOrbitscarBattle(input); session = startBattle(session, { input, result, attemptId: newAttemptId(), startedAt: performance.now(), eventIndex: 0, done: false }); lastUiReplayTick = -1; refresh(); }
@@ -103,14 +120,25 @@ function handleAction(action: string): void {
   if (action === "colony") { session = clearAttackPlan(session); setMode("colony"); return; }
   if (action === "targets") { session = clearAttackPlan(session); setMode("targets"); return; }
   if (action === "army") { session = beginArmyComposition(session); setMode("army"); return; }
-  if (action === "collect") { colony = advanceColony(colony, 300, content); saveColony("Extractor cycle collected."); return; }
+  if (action === "collect") { colony = collectColonyProduction(colony, Date.now(), content); saveColony("Stored production collected."); return; }
   if (action === "save") { saveColony("Colony saved locally."); return; }
+  if (verb === "replay-report" && value) {
+    const report = colony.reports.find((entry) => entry.attemptId === value);
+    if (!report?.input) { setNotice("This legacy report has no saved replay snapshot."); return; }
+    selectedTarget = { id: report.kind === "defense" ? "home-colony" : selectedTarget.id, name: report.kind === "defense" ? "Home Colony" : selectedTarget.name, codename: report.kind === "defense" ? "DEFENSE-LOG" : selectedTarget.codename, difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures, suggestedCounters: [] };
+    session = startBattle(session, { kind: report.kind, input: report.input, result: report.result, attemptId: report.attemptId, startedAt: performance.now(), eventIndex: 0, done: false });
+    lastUiReplayTick = -1;
+    refresh();
+    return;
+  }
+  if (action === "simulate-raid") { startColonyRaid(); return; }
   if (action === "toggle-readability") { colony = { ...colony, settings: { ...colony.settings, reducedMotion: !colony.settings.reducedMotion } }; saveColony(colony.settings.reducedMotion ? "Low-effects readability mode on: calmer tactical updates, all gameplay information preserved." : "Standard effects restored."); return; }
   if (verb === "scout" && value && content.encounters[value]) { selectedTarget = content.encounters[value]; notice = `${selectedTarget.name} snapshot loaded into the tactical view.`; refresh(); return; }
   if (verb === "train" && value) { try { colony = trainUnits(colony, value, 1, content); saveColony(`${displayName(value)} added to reserves.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Training failed."); } return; }
   if (verb === "build" && value && content.buildings[value]) { buildMode = value; selectedBuildingId = undefined; setNotice(`Placement mode: ${displayName(value)}. Tap an open grid cell.`); return; }
   if (verb === "select-building" && value) { selectedBuildingId = value; notice = `${displayName(colony.buildings.find((building) => building.id === value)?.buildingId ?? value)} selected.`; refresh(); return; }
   if (verb === "upgrade" && value) { try { colony = upgradeColonyBuilding(colony, value, content); saveColony("Module upgraded."); } catch (error) { setNotice(error instanceof Error ? error.message : "Upgrade failed."); } return; }
+  if (verb === "repair" && value) { try { colony = repairColonyBuilding(colony, value, content); saveColony("Module integrity restored."); } catch (error) { setNotice(error instanceof Error ? error.message : "Repair failed."); } return; }
   if (verb === "army" && value && unitId) { adjustArmy(unitId, value === "+" ? 1 : -1); return; }
   if (action === "begin-deployment") { if (capacityOf(session.plan.selectedArmy) === 0) { setNotice("Choose at least one unit from your persistent reserves."); return; } session = beginDeployment(session); setMode("deployment"); return; }
   if (verb === "zone" && value && ["west", "north", "south", "east"].includes(value)) { updatePlan({ ...session.plan, selectedZone: value as Zone }); return; }
@@ -123,7 +151,7 @@ function handleAction(action: string): void {
   if (action === "restart-plan") { session = restartPlan(session); setMode("deployment"); return; }
   if (action === "cancel-deployment") { session = clearAttackPlan(session); setMode("targets"); return; }
   if (action === "attack-again") { session = attackAgain(session); setMode("army"); return; }
-  if (action === "return-home" && session.replay) { try { colony = applyBattleResult(colony, session.replay.input, session.replay.result, session.replay.attemptId); saveColony("Battle report archived. Survivors and salvage reconciled."); session = clearAttackPlan(session); setMode("colony"); } catch (error) { setNotice(error instanceof Error ? error.message : "Settlement rejected."); } }
+  if (action === "return-home" && session.replay) { try { colony = session.replay.kind === "defense" ? applyColonyDefenseResult(colony, session.replay.input, session.replay.result, session.replay.attemptId) : applyBattleResult(colony, session.replay.input, session.replay.result, session.replay.attemptId); saveColony(session.replay.kind === "defense" ? "Raid report archived. Colony damage recorded." : "Battle report archived. Survivors and salvage reconciled."); session = clearAttackPlan(session); setMode("colony"); } catch (error) { setNotice(error instanceof Error ? error.message : "Settlement rejected."); } }
 }
 
 function placeBuilding(position: { x: number; y: number }): void {

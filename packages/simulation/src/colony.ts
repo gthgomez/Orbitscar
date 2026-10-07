@@ -2,10 +2,13 @@ import type { OrbitscarBattleInput, OrbitscarBattleResult, OrbitscarPosition } f
 import type { OrbitscarContent, OrbitscarResourceBundle } from "@orbitscar/content";
 import { authoritativeDigest, canonicalSerialize } from "./hash.js";
 
-export const COLONY_SCHEMA_VERSION = 3;
+export const COLONY_SCHEMA_VERSION = 4;
+export const MAX_ECONOMY_CATCHUP_MS = 4 * 60 * 60 * 1000;
+export const RESOURCE_CAPS: Readonly<Record<string, number>> = { alloy: 600, volatile: 300, signal: 240 };
 export type ColonyBuilding = { id: string; buildingId: string; position: OrbitscarPosition; level: number; health: number };
-export type ColonyReport = { id: string; attemptId: string; createdAt: string; result: OrbitscarBattleResult };
-export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
+export type ColonyReport = { id: string; attemptId: string; createdAt: string; kind: "attack" | "defense"; input?: OrbitscarBattleInput; result: OrbitscarBattleResult };
+export const MAX_COLONY_REPORTS = 50;
+export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
 export type ColonySave = { schemaVersion: number; payload: ColonyState; checksum: string };
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
@@ -17,14 +20,16 @@ function overlap(a: ColonyBuilding, b: ColonyBuilding, content: OrbitscarContent
 
 export function createColony(playerId: string, content: OrbitscarContent): ColonyState {
   const timestamp = now();
-  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], reports: [], settings: { muted: false, reducedMotion: false } };
+  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], reports: [], settings: { muted: false, reducedMotion: false } };
 }
 
-export function placeColonyBuilding(state: ColonyState, buildingId: string, position: OrbitscarPosition, content: OrbitscarContent): ColonyState {
+export function placeColonyBuilding(state: ColonyState, buildingId: string, position: OrbitscarPosition, content: OrbitscarContent, atMs = Date.now()): ColonyState {
+  state = settleColonyProduction(state, atMs, content);
   const definition = content.buildings[buildingId]; if (!definition) throw new Error(`unknown building '${buildingId}'`); if (position.x < 0 || position.y < 0 || position.x + definition.footprint[0] * 40 > 1200 || position.y + definition.footprint[1] * 40 > 800) throw new Error("building is outside colony bounds"); if (state.buildings.some((building) => overlap(building, { id: "candidate", buildingId, position, level: 1, health: definition.maxHealth }, content))) throw new Error("building overlaps an existing structure"); if (!canAfford(state.resources, definition.cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, definition.cost); next.buildings.push({ id: `${buildingId}-${next.buildings.length + 1}`, buildingId, position: { ...position }, level: 1, health: definition.maxHealth }); next.updatedAt = now(); return next;
 }
 
-export function upgradeColonyBuilding(state: ColonyState, buildingId: string, content: OrbitscarContent): ColonyState {
+export function upgradeColonyBuilding(state: ColonyState, buildingId: string, content: OrbitscarContent, atMs = Date.now()): ColonyState {
+  state = settleColonyProduction(state, atMs, content);
   const existing = state.buildings.find((building) => building.id === buildingId);
   if (!existing) throw new Error(`unknown colony building '${buildingId}'`);
   const definition = content.buildings[existing.buildingId];
@@ -41,8 +46,45 @@ export function upgradeColonyBuilding(state: ColonyState, buildingId: string, co
   return next;
 }
 
-export function advanceColony(state: ColonyState, ticks: number, content: OrbitscarContent): ColonyState {
-  if (!Number.isInteger(ticks) || ticks < 0) throw new Error("ticks must be a non-negative integer"); const next = clone(state); const extractorCount = next.buildings.filter((building) => building.buildingId === "matter_extractor" && building.health > 0).length; const cycles = Math.floor(ticks / 30); next.resources.alloy = (next.resources.alloy ?? 0) + extractorCount * cycles * 3; next.resources.volatile = (next.resources.volatile ?? 0) + extractorCount * cycles; next.resources.signal = (next.resources.signal ?? 0) + extractorCount * cycles; next.updatedAt = now(); return next;
+function addProduction(state: ColonyState, minutes: number): ColonyState {
+  const next = clone(state);
+  const extractorPower = next.buildings
+    .filter((building) => building.buildingId === "matter_extractor" && building.health > 0)
+    .reduce((sum, building) => sum + 1 + (building.level - 1) * 0.5, 0);
+  for (const [resourceId, ratePerMinute] of Object.entries({ alloy: 6, volatile: 2, signal: 2 })) {
+    const cap = RESOURCE_CAPS[resourceId] ?? Number.MAX_SAFE_INTEGER;
+    next.resources[resourceId] = Math.min(cap, (next.resources[resourceId] ?? 0) + Math.floor(extractorPower * ratePerMinute * minutes));
+  }
+  next.updatedAt = now();
+  return next;
+}
+
+/** Deterministic game-time production used by simulations and fixtures. */
+export function advanceColony(state: ColonyState, ticks: number, _content: OrbitscarContent): ColonyState {
+  if (!Number.isInteger(ticks) || ticks < 0) throw new Error("ticks must be a non-negative integer");
+  return addProduction(state, Math.floor(ticks / 30));
+}
+
+/** Settle old production rates before a building level, footprint, or health change. */
+export function settleColonyProduction(state: ColonyState, atMs: number, content: OrbitscarContent): ColonyState {
+  const next = collectColonyProduction(state, atMs, content);
+  next.productionUpdatedAt = new Date(atMs).toISOString();
+  next.updatedAt = new Date(atMs).toISOString();
+  return next;
+}
+
+/** Collect production accrued since the last collection; no click can mint time or exceed storage. */
+export function collectColonyProduction(state: ColonyState, atMs: number, _content: OrbitscarContent): ColonyState {
+  if (!Number.isFinite(atMs) || atMs < 0) throw new Error("collection clock must be a valid timestamp");
+  const previous = Date.parse(state.productionUpdatedAt);
+  if (!Number.isFinite(previous) || atMs < previous) throw new Error("collection clock cannot move backwards");
+  const elapsedMs = atMs - previous;
+  const boundedMs = Math.min(elapsedMs, MAX_ECONOMY_CATCHUP_MS);
+  const minutes = Math.floor(boundedMs / 60_000);
+  const next = addProduction(state, minutes);
+  if (elapsedMs >= MAX_ECONOMY_CATCHUP_MS) next.productionUpdatedAt = new Date(atMs).toISOString();
+  else next.productionUpdatedAt = new Date(previous + minutes * 60_000).toISOString();
+  return next;
 }
 
 export function trainUnits(state: ColonyState, unitId: string, count: number, content: OrbitscarContent): ColonyState {
@@ -52,6 +94,7 @@ export function trainUnits(state: ColonyState, unitId: string, count: number, co
 export function applyBattleResult(state: ColonyState, input: OrbitscarBattleInput, result: OrbitscarBattleResult, attemptId: string): ColonyState {
   if (attemptId.trim().length === 0) throw new Error("attemptId must be a non-empty string");
   if (state.reports.some((report) => report.attemptId === attemptId)) return clone(state);
+  state = settleColonyProduction(state, Date.now(), input.content);
   const deployed: Record<string, number> = {};
   for (const usage of result.deploymentUsage) {
     for (const entry of usage.units) deployed[entry.unitId] = (deployed[entry.unitId] ?? 0) + entry.count;
@@ -71,7 +114,40 @@ export function applyBattleResult(state: ColonyState, input: OrbitscarBattleInpu
     next.reserves[unitId] += count - (result.attackerCasualties[unitId] ?? 0);
   }
   next.resources = sumBundle(next.resources, result.loot);
-  next.reports.unshift({ id: attemptId, attemptId, createdAt: now(), result: clone(result) });
+  for (const [resourceId, cap] of Object.entries(RESOURCE_CAPS)) next.resources[resourceId] = Math.min(cap, next.resources[resourceId] ?? 0);
+  next.reports.unshift({ id: attemptId, attemptId, createdAt: now(), kind: "attack", input: clone(input), result: clone(result) });
+  next.reports = next.reports.slice(0, MAX_COLONY_REPORTS);
+  next.updatedAt = now();
+  return next;
+}
+
+export function applyColonyDefenseResult(state: ColonyState, input: OrbitscarBattleInput, result: OrbitscarBattleResult, attemptId: string, atMs = Date.now()): ColonyState {
+  if (attemptId.trim().length === 0) throw new Error("attemptId must be a non-empty string");
+  if (state.reports.some((report) => report.attemptId === attemptId)) return clone(state);
+  state = settleColonyProduction(state, atMs, input.content);
+  const next = clone(state);
+  next.buildings = next.buildings.map((building) => ({ ...building, health: Math.max(0, building.health - (result.damageByEntity[building.id] ?? 0)) }));
+  next.reports.unshift({ id: attemptId, attemptId, createdAt: now(), kind: "defense", input: clone(input), result: clone(result) });
+  next.reports = next.reports.slice(0, MAX_COLONY_REPORTS);
+  next.updatedAt = now();
+  return next;
+}
+
+export function repairColonyBuilding(state: ColonyState, buildingId: string, content: OrbitscarContent, atMs = Date.now()): ColonyState {
+  state = settleColonyProduction(state, atMs, content);
+  const building = state.buildings.find((entry) => entry.id === buildingId);
+  if (!building) throw new Error(`unknown colony building '${buildingId}'`);
+  const definition = content.buildings[building.buildingId];
+  if (!definition) throw new Error(`unknown building '${building.buildingId}'`);
+  const maxHealth = definition.maxHealth * (1 + (building.level - 1) * 0.25);
+  if (building.health >= maxHealth) throw new Error("building does not need repair");
+  const missingRatio = (maxHealth - building.health) / maxHealth;
+  const cost = Object.fromEntries(Object.entries(definition.cost).map(([resourceId, amount]) => [resourceId, Math.ceil(amount * missingRatio * 0.35)]));
+  if (!canAfford(state.resources, cost)) throw new Error("insufficient resources");
+  const next = clone(state);
+  spend(next.resources, cost);
+  const repaired = next.buildings.find((entry) => entry.id === buildingId)!;
+  repaired.health = maxHealth;
   next.updatedAt = now();
   return next;
 }
@@ -82,11 +158,12 @@ export function parseColonySave(serialized: string): ColonyState {
   try { parsed = JSON.parse(serialized); } catch { throw new Error("colony save is not valid JSON"); }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("colony save must be an object");
   const save = parsed as Partial<ColonySave>;
-  if (save.payload === undefined || typeof save.checksum !== "string" || (save.schemaVersion !== 1 && save.schemaVersion !== 2 && save.schemaVersion !== COLONY_SCHEMA_VERSION)) throw new Error("unsupported colony save schema");
+  if (save.payload === undefined || typeof save.checksum !== "string" || (save.schemaVersion !== 1 && save.schemaVersion !== 2 && save.schemaVersion !== 3 && save.schemaVersion !== COLONY_SCHEMA_VERSION)) throw new Error("unsupported colony save schema");
   if (authoritativeDigest(save.payload) !== save.checksum) throw new Error("colony save checksum mismatch");
   const payload = clone(save.payload);
   payload.schemaVersion = COLONY_SCHEMA_VERSION;
   payload.settings = payload.settings ?? { muted: false, reducedMotion: false };
-  payload.reports = (payload.reports ?? []).map((report, index) => ({ ...report, attemptId: report.attemptId ?? report.id ?? `legacy-attempt-${index + 1}` }));
+  payload.productionUpdatedAt = payload.productionUpdatedAt ?? payload.updatedAt ?? payload.createdAt;
+  payload.reports = (payload.reports ?? []).map((report, index) => ({ ...report, kind: report.kind ?? "attack", attemptId: report.attemptId ?? report.id ?? `legacy-attempt-${index + 1}` }));
   return payload;
 }
