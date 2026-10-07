@@ -14,9 +14,10 @@ The working title is provisional and has not received trademark, domain, or stor
 - `packages/content/` — declarative buildings, units, defenses, commanders, authored NPC targets, and validation.
 - `fixtures/` — small reproducible battle inputs.
 - `apps/web/` — Phaser tactical view plus an accessible DOM command surface for colony, target, army, deployment, replay, and report states.
+- `apps/server/` — loopback-only local authority for persistent profiles, versioned defender snapshots, validated rival attacks, and idempotent report settlement.
 - `docs/` — recovered research plus independent product, architecture, UX, art, economy, security, testing, and roadmap records.
 
-The current product gate is a coherent local colony-to-breach loop: build, train, scout, compose, deploy, watch autonomous combat, read the report, and return with reconciled survivors and salvage. Alliances, live operations, monetization, and a persistent backend remain deliberately deferred.
+The local product loop includes colony development, scouting, live command combat, reports, defensive raids, and a persistent profile API. The rival API is a closed-alpha development service; it has no accounts, remote network exposure, or production hosting.
 
 ## Local commands
 
@@ -29,10 +30,37 @@ pnpm test:browser
 pnpm evaluate -- --runs 1344 --out runs/eval-local
 pnpm simulate -- fixtures/battle_fixture.json
 pnpm --filter @orbitscar/web build
+pnpm --filter @orbitscar/server dev
 pnpm check
+```
 
 The browser client is intentionally Phaser-only for tactical rendering; React is not a dependency.
-```
+
+## Local rival authority
+
+The server binds to `127.0.0.1:4179` and stores versioned data at
+`.orbitscar/server-state.json` by default. Set `ORBITSCAR_PORT` or
+`ORBITSCAR_DATABASE` to change the local port or save path. It supports:
+
+- `POST /profiles` to create a local profile;
+- `GET /profiles/:id` and `GET /profiles/:id/snapshot` to inspect an identity
+  and receive a versioned, hashed base snapshot;
+- `POST /profiles/:id/actions` for validated `TRAIN`, `BUILD`, `UPGRADE`,
+  `RESEARCH`, `COMMANDER`, `SCOUT`, `COLLECT`, and `REPAIR` actions;
+- `POST /attacks` with attacker/defender versions, the defender snapshot hash,
+  an army drawn from server reserves, and an ordered command stream. The
+  server builds the battle input and resolves it through the shared simulation;
+- `GET /attacks/:id` to retrieve a persisted deterministic report and replay.
+
+Mutations require an idempotency `requestId` and expected profile version.
+Attacks settle both colonies atomically and reject stale snapshots, invalid
+capacity, unknown units, and client-supplied results. Direct HTTP integration
+tests exercise multiple local profiles, concurrent attacks, duplicate
+settlement, restart persistence, and replay reproduction. This API is not
+configured for public network use. Run one server process per database path.
+The local authority retains the latest 10,000 idempotency records and 250
+attack reports; profile and defender snapshot versions reject replayed stale
+mutations after an old idempotency record expires.
 
 Human blind-test instrumentation lives in `docs/playtest/` (protocol, observation form, session checklist); the item-10 gate remains BLOCKED_ON_HUMAN_PLAYTEST until five real sessions are recorded.
 
