@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding, researchDoctrine, selectColonyCommander } from "./colony.js";
+import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding, researchDoctrine, selectColonyCommander, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { buildColonyRaidInput } from "./raid.js";
 import { resolveOrbitscarBattle } from "./orbitscar.js";
 
@@ -10,7 +10,7 @@ const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/
 
 describe("colony raid loop", () => {
   it("converts the live colony layout into the authoritative battle snapshot", () => {
-    const colony = placeColonyBuilding(createColony("defender", content), "scatter_coil", { x: 120, y: 320 }, content);
+    const colony = placeColonyBuilding(upgradeColonyBuilding(trainUnits(createColony("defender", content), "line_rigger", 3, content), "command-relay-1", content), "scatter_coil", { x: 120, y: 320 }, content);
     const input = buildColonyRaidInput(colony, "scavenger_swarm", 40, content);
     expect(input.structures.map(({ id }) => id).sort()).toEqual(colony.buildings.map(({ id }) => id).sort());
     expect(input.army.length).toBeGreaterThan(0);
@@ -30,7 +30,8 @@ describe("colony raid loop", () => {
 
   it("applies the colony defense doctrine to installed structure durability and fire", () => {
     const built = placeColonyBuilding(createColony("defender", content), "arc_projector", { x: 600, y: 320 }, content);
-    const base = { ...built, buildings: built.buildings.map((building) => building.id === "command-relay-1" ? { ...building, health: 100 } : building) };
+    const tierTwo = upgradeColonyBuilding(trainUnits(built, "line_rigger", 3, content), "command-relay-1", content);
+    const base = { ...tierTwo, buildings: tierTwo.buildings.map((building) => building.id === "command-relay-1" ? { ...building, health: 100 } : building) };
     const specialized = researchDoctrine(base, "defense", content);
     const plainInput = buildColonyRaidInput(base, "breach_column", 77, content);
     const defendedInput = buildColonyRaidInput(specialized, "breach_column", 77, content);
@@ -48,7 +49,7 @@ describe("colony raid loop", () => {
   });
 
   it("settles raid damage once and lets the owner repair a disabled structure", () => {
-    const colony = placeColonyBuilding(createColony("defender", content), "scatter_coil", { x: 120, y: 320 }, content);
+    const colony = placeColonyBuilding(upgradeColonyBuilding(trainUnits(createColony("defender", content), "line_rigger", 3, content), "command-relay-1", content), "scatter_coil", { x: 120, y: 320 }, content);
     const input = buildColonyRaidInput(colony, "breach_column", 18, content);
     const result = resolveOrbitscarBattle(input);
     const after = applyColonyDefenseResult(colony, input, result, "raid-18");

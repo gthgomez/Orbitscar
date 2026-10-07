@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbitscar/content";
-import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, placeColonyBuilding, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, commandTierOf, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
@@ -49,7 +49,7 @@ function restoreActiveBattle(): void {
     if (input.rulesetVersion !== content.rulesetVersion) throw new Error("active battle ruleset is no longer available");
     const result = resolveOrbitscarBattle(input);
     const currentTick = Math.min(input.maxDurationTicks, parsed.currentTick!);
-    selectedTarget = content.encounters[parsed.targetId] ?? { id: parsed.targetId, name: parsed.kind === "defense" ? "Home Colony" : "Archived Target", codename: parsed.targetId.toUpperCase(), difficulty: "contested", description: "Recovered deterministic battle snapshot.", rewardPreview: input.rewardPreview, structures: input.structures, suggestedCounters: [] };
+    selectedTarget = content.encounters[parsed.targetId] ?? { id: parsed.targetId, requiredTier: 1, opponentTier: 1, name: parsed.kind === "defense" ? "Home Colony" : "Archived Target", codename: parsed.targetId.toUpperCase(), difficulty: "contested", description: "Recovered deterministic battle snapshot.", rewardPreview: input.rewardPreview, structures: input.structures, suggestedCounters: [] };
     const army = Object.fromEntries(input.army.map((entry) => [entry.unitId, entry.count]));
     const waves = input.commands.filter((command) => command.type === "DEPLOY").map((command) => ({ zone: command.payload.zone, units: command.payload.units }));
     const staged = Object.fromEntries(Object.keys(army).map((unitId) => [unitId, waves.reduce((sum, wave) => sum + (wave.units.find((entry) => entry.unitId === unitId)?.count ?? 0), 0)]));
@@ -166,7 +166,7 @@ function startColonyRaid(): void {
     const result = resolveOrbitscarBattle(input);
     colony = applyColonyDefenseResult(colony, input, result, `raid-${seed}`);
     persistColony(colony, "Raid result recorded.");
-    selectedTarget = { id: "home-colony", name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures, suggestedCounters: [] };
+    selectedTarget = { id: "home-colony", requiredTier: 1, opponentTier: 1, name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures, suggestedCounters: [] };
     session = startBattle(session, { kind: "defense", input, result, attemptId: `raid-${seed}`, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0 });
     persistActiveBattle();
     lastUiReplayTick = -1;
@@ -215,7 +215,7 @@ function handleAction(action: string): void {
   const [verb, value, unitId] = action.split(":");
   if (action === "colony") { session = clearAttackPlan(session); setMode("colony"); return; }
   if (action === "targets") { session = clearAttackPlan(session); setMode("targets"); return; }
-  if (action === "army") { session = beginArmyComposition(session); setMode("army"); return; }
+  if (action === "army") { if (!colony.scoutedTargets.includes(selectedTarget.id)) { session = clearAttackPlan(session); setMode("targets"); setNotice("Scout the selected target before composing a force."); return; } session = beginArmyComposition(session); setMode("army"); return; }
   if (action === "collect") { colony = collectColonyProduction(colony, Date.now(), content); saveColony("Stored production collected."); return; }
   if (action === "save") { saveColony("Colony saved locally."); return; }
   if (verb === "commander" && value) { try { colony = selectColonyCommander(colony, value, content); saveColony(`${displayName(value)} assigned to the command seat.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Commander selection failed."); } return; }
@@ -223,7 +223,7 @@ function handleAction(action: string): void {
   if (verb === "replay-report" && value) {
     const report = colony.reports.find((entry) => entry.attemptId === value);
     if (!report?.input) { setNotice("This legacy report has no saved replay snapshot."); return; }
-    selectedTarget = { id: report.kind === "defense" ? "home-colony" : selectedTarget.id, name: report.kind === "defense" ? "Home Colony" : selectedTarget.name, codename: report.kind === "defense" ? "DEFENSE-LOG" : selectedTarget.codename, difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures, suggestedCounters: [] };
+    selectedTarget = { id: report.kind === "defense" ? "home-colony" : selectedTarget.id, requiredTier: 1, opponentTier: 1, name: report.kind === "defense" ? "Home Colony" : selectedTarget.name, codename: report.kind === "defense" ? "DEFENSE-LOG" : selectedTarget.codename, difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures, suggestedCounters: [] };
     clearActiveBattle();
     session = startBattle(session, { kind: report.kind, input: report.input, result: report.result, attemptId: report.attemptId, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0, archived: true });
     lastUiReplayTick = -1;
@@ -232,7 +232,7 @@ function handleAction(action: string): void {
   }
   if (action === "simulate-raid") { startColonyRaid(); return; }
   if (action === "toggle-readability") { colony = { ...colony, settings: { ...colony.settings, reducedMotion: !colony.settings.reducedMotion } }; saveColony(colony.settings.reducedMotion ? "Low-effects readability mode on: calmer tactical updates, all gameplay information preserved." : "Standard effects restored."); return; }
-  if (verb === "scout" && value && content.encounters[value]) { selectedTarget = content.encounters[value]; notice = `${selectedTarget.name} snapshot loaded into the tactical view.`; refresh(); return; }
+  if (verb === "scout" && value && content.encounters[value] && content.encounters[value].requiredTier <= commandTierOf(colony)) { try { selectedTarget = content.encounters[value]; colony = recordColonyScout(colony, value, content); saveColony(`${selectedTarget.name} intel recorded.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Scouting failed."); } return; }
   if (verb === "train" && value) { try { colony = trainUnits(colony, value, 1, content); saveColony(`${displayName(value)} added to reserves.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Training failed."); } return; }
   if (verb === "build" && value && content.buildings[value]) { buildMode = value; selectedBuildingId = undefined; setNotice(`Placement mode: ${displayName(value)}. Tap an open grid cell.`); return; }
   if (verb === "select-building" && value) { selectedBuildingId = value; notice = `${displayName(colony.buildings.find((building) => building.id === value)?.buildingId ?? value)} selected.`; refresh(); return; }

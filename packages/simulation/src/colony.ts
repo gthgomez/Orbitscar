@@ -2,13 +2,13 @@ import type { OrbitscarBattleInput, OrbitscarBattleResult, OrbitscarPosition } f
 import type { OrbitscarContent, OrbitscarResourceBundle } from "@orbitscar/content";
 import { authoritativeDigest, canonicalSerialize } from "./hash.js";
 
-export const COLONY_SCHEMA_VERSION = 6;
+export const COLONY_SCHEMA_VERSION = 7;
 export const MAX_ECONOMY_CATCHUP_MS = 4 * 60 * 60 * 1000;
 export const RESOURCE_CAPS: Readonly<Record<string, number>> = { alloy: 600, volatile: 300, signal: 240 };
 export type ColonyBuilding = { id: string; buildingId: string; position: OrbitscarPosition; level: number; health: number };
 export type ColonyReport = { id: string; attemptId: string; createdAt: string; kind: "attack" | "defense"; input?: OrbitscarBattleInput; result: OrbitscarBattleResult };
 export const MAX_COLONY_REPORTS = 50;
-export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; doctrineId: string; commanderId: string; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
+export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; doctrineId: string; commanderId: string; scoutedTargets: string[]; completedObjectives: string[]; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
 export type ColonySave = { schemaVersion: number; payload: ColonyState; checksum: string };
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
@@ -20,7 +20,30 @@ function overlap(a: ColonyBuilding, b: ColonyBuilding, content: OrbitscarContent
 
 export function createColony(playerId: string, content: OrbitscarContent): ColonyState {
   const timestamp = now();
-  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], doctrineId: "none", commanderId: "mara_voss", reports: [], settings: { muted: false, reducedMotion: false } };
+  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], doctrineId: "none", commanderId: "mara_voss", scoutedTargets: [], completedObjectives: [], reports: [], settings: { muted: false, reducedMotion: false } };
+}
+
+function markObjective(state: ColonyState, objectiveId: string): void { if (!state.completedObjectives.includes(objectiveId)) state.completedObjectives.push(objectiveId); }
+
+export function commandTierOf(state: ColonyState): number {
+  const relays = state.buildings.filter((building) => building.buildingId === "command_relay");
+  const level = relays.reduce((highest, relay) => Number.isInteger(relay.level) ? Math.max(highest, relay.level) : highest, 1);
+  return Math.min(3, Math.max(1, level));
+}
+
+export function recordColonyScout(state: ColonyState, targetId: string, content: OrbitscarContent): ColonyState {
+  const target = content.encounters[targetId];
+  if (!target) throw new Error(`unknown scout target '${targetId}'`);
+  if (target.requiredTier > commandTierOf(state)) throw new Error(`scouting target requires Command Tier ${target.requiredTier}`);
+  const next = clone(state);
+  if (!next.scoutedTargets.includes(targetId)) {
+    if ((next.resources.signal ?? 0) < 5) throw new Error("insufficient signal for scouting");
+    next.resources.signal -= 5;
+    next.scoutedTargets.push(targetId);
+  }
+  markObjective(next, "first-scout");
+  next.updatedAt = now();
+  return next;
 }
 
 export function selectColonyCommander(state: ColonyState, commanderId: string, content: OrbitscarContent): ColonyState {
@@ -34,26 +57,32 @@ export function selectColonyCommander(state: ColonyState, commanderId: string, c
 export function researchDoctrine(state: ColonyState, doctrineId: string, content: OrbitscarContent): ColonyState {
   const doctrine = content.doctrines[doctrineId];
   if (!doctrine || doctrine.theme === "none") throw new Error(`unknown doctrine '${doctrineId}'`);
+  if (commandTierOf(state) < doctrine.requiredTier) throw new Error(`doctrine research requires Command Tier ${doctrine.requiredTier}`);
   if (state.doctrineId !== "none") throw new Error("doctrine already committed; this choice is permanent");
   if (!canAfford(state.resources, doctrine.cost)) throw new Error("insufficient resources for doctrine research");
   const next = clone(state);
   spend(next.resources, doctrine.cost);
   next.research.push(doctrineId);
   next.doctrineId = doctrineId;
+  markObjective(next, "first-doctrine");
   next.updatedAt = now();
   return next;
 }
 
 export function placeColonyBuilding(state: ColonyState, buildingId: string, position: OrbitscarPosition, content: OrbitscarContent, atMs = Date.now()): ColonyState {
   state = settleColonyProduction(state, atMs, content);
-  const definition = content.buildings[buildingId]; if (!definition) throw new Error(`unknown building '${buildingId}'`); if (position.x < 0 || position.y < 0 || position.x + definition.footprint[0] * 40 > 1200 || position.y + definition.footprint[1] * 40 > 800) throw new Error("building is outside colony bounds"); if (state.buildings.some((building) => overlap(building, { id: "candidate", buildingId, position, level: 1, health: definition.maxHealth }, content))) throw new Error("building overlaps an existing structure"); if (!canAfford(state.resources, definition.cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, definition.cost); next.buildings.push({ id: `${buildingId}-${next.buildings.length + 1}`, buildingId, position: { ...position }, level: 1, health: definition.maxHealth }); next.updatedAt = now(); return next;
+  const definition = content.buildings[buildingId]; if (buildingId === "command_relay" && state.buildings.some((building) => building.buildingId === "command_relay")) throw new Error("Command Relay is unique to this colony"); if (!definition) throw new Error(`unknown building '${buildingId}'`); if (definition.requiredTier > commandTierOf(state)) throw new Error(`building requires Command Tier ${definition.requiredTier}`); if (position.x < 0 || position.y < 0 || position.x + definition.footprint[0] * 40 > 1200 || position.y + definition.footprint[1] * 40 > 800) throw new Error("building is outside colony bounds"); if (state.buildings.some((building) => overlap(building, { id: "candidate", buildingId, position, level: 1, health: definition.maxHealth }, content))) throw new Error("building overlaps an existing structure"); if (!canAfford(state.resources, definition.cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, definition.cost); next.buildings.push({ id: `${buildingId}-${next.buildings.length + 1}`, buildingId, position: { ...position }, level: 1, health: definition.maxHealth }); if (definition.defenseId) markObjective(next, "first-defense"); next.updatedAt = now(); return next;
 }
 
 export function upgradeColonyBuilding(state: ColonyState, buildingId: string, content: OrbitscarContent, atMs = Date.now()): ColonyState {
   state = settleColonyProduction(state, atMs, content);
   const existing = state.buildings.find((building) => building.id === buildingId);
   if (!existing) throw new Error(`unknown colony building '${buildingId}'`);
+  const highestRelayLevel = state.buildings.filter((building) => building.buildingId === "command_relay").reduce((highest, relay) => Math.max(highest, relay.level), 1);
+  if (existing.buildingId === "command_relay" && existing.level < highestRelayLevel) throw new Error("upgrade the highest-level Command Relay first");
+  if (existing.buildingId === "command_relay" && existing.level === 1 && !state.completedObjectives.includes("starter-force")) throw new Error("train a starter force before upgrading Command Tier");
   const definition = content.buildings[existing.buildingId];
+  if (existing.buildingId === "command_relay" && existing.level >= 3) throw new Error("Command Tier is already at maximum");
   if (!definition) throw new Error(`unknown building '${existing.buildingId}'`);
   const cost: OrbitscarResourceBundle = Object.fromEntries(Object.entries(definition.cost).map(([resourceId, amount]) => [resourceId, Math.ceil(amount * (1 + existing.level * 0.5))]));
   if (!canAfford(state.resources, cost)) throw new Error("insufficient resources");
@@ -63,6 +92,7 @@ export function upgradeColonyBuilding(state: ColonyState, buildingId: string, co
   if (!upgraded) throw new Error(`unknown colony building '${buildingId}'`);
   upgraded.level += 1;
   upgraded.health = Math.ceil(definition.maxHealth * (1 + (upgraded.level - 1) * 0.25));
+  if (upgraded.buildingId === "command_relay" && upgraded.level >= 2) markObjective(next, "command-tier-2");
   next.updatedAt = now();
   return next;
 }
@@ -109,7 +139,7 @@ export function collectColonyProduction(state: ColonyState, atMs: number, _conte
 }
 
 export function trainUnits(state: ColonyState, unitId: string, count: number, content: OrbitscarContent): ColonyState {
-  const definition = content.units[unitId]; if (!definition) throw new Error(`unknown unit '${unitId}'`); if (!Number.isInteger(count) || count < 1) throw new Error("count must be a positive integer"); const multiplier = content.doctrines[state.doctrineId]?.trainingCostMultiplier ?? 1; const cost: OrbitscarResourceBundle = {}; for (const [id, amount] of Object.entries(definition.cost)) cost[id] = Math.ceil(amount * count * multiplier); if (!canAfford(state.resources, cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, cost); next.reserves[unitId] = (next.reserves[unitId] ?? 0) + count; next.updatedAt = now(); return next;
+  const definition = content.units[unitId]; if (!definition) throw new Error(`unknown unit '${unitId}'`); if (definition.requiredTier > commandTierOf(state)) throw new Error(`unit requires Command Tier ${definition.requiredTier}`); if (!Number.isInteger(count) || count < 1) throw new Error("count must be a positive integer"); const multiplier = content.doctrines[state.doctrineId]?.trainingCostMultiplier ?? 1; const cost: OrbitscarResourceBundle = {}; for (const [id, amount] of Object.entries(definition.cost)) cost[id] = Math.ceil(amount * count * multiplier); if (!canAfford(state.resources, cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, cost); next.reserves[unitId] = (next.reserves[unitId] ?? 0) + count; if (Object.values(next.reserves).reduce((sum, reserve) => sum + reserve, 0) >= 3) markObjective(next, "starter-force"); next.updatedAt = now(); return next;
 }
 
 export function applyBattleResult(state: ColonyState, input: OrbitscarBattleInput, result: OrbitscarBattleResult, attemptId: string): ColonyState {
@@ -134,6 +164,7 @@ export function applyBattleResult(state: ColonyState, input: OrbitscarBattleInpu
     next.reserves[unitId] -= count;
     next.reserves[unitId] += count - (result.attackerCasualties[unitId] ?? 0);
   }
+  if (Object.keys(deployed).length > 0) markObjective(next, "first-sortie");
   next.resources = sumBundle(next.resources, result.loot);
   for (const [resourceId, cap] of Object.entries(RESOURCE_CAPS)) next.resources[resourceId] = Math.min(cap, next.resources[resourceId] ?? 0);
   next.reports.unshift({ id: attemptId, attemptId, createdAt: now(), kind: "attack", input: clone(input), result: clone(result) });
@@ -180,12 +211,29 @@ export function parseColonySave(serialized: string): ColonyState {
   try { parsed = JSON.parse(serialized); } catch { throw new Error("colony save is not valid JSON"); }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("colony save must be an object");
   const save = parsed as Partial<ColonySave>;
-  if (save.payload === undefined || typeof save.checksum !== "string" || ![1, 2, 3, 4, 5, COLONY_SCHEMA_VERSION].includes(save.schemaVersion ?? -1)) throw new Error("unsupported colony save schema");
+  if (save.payload === undefined || typeof save.checksum !== "string" || ![1, 2, 3, 4, 5, 6, COLONY_SCHEMA_VERSION].includes(save.schemaVersion ?? -1)) throw new Error("unsupported colony save schema");
   if (authoritativeDigest(save.payload) !== save.checksum) throw new Error("colony save checksum mismatch");
   const payload = clone(save.payload);
+  if (!Array.isArray(payload.buildings)) throw new Error("colony save contains malformed buildings");
+  // Older saves allowed duplicate Command Relays. Keep the strongest relay (first on ties)
+  // so legacy colonies retain their tier without preserving duplicate command structures.
+  if ((save.schemaVersion ?? 0) < COLONY_SCHEMA_VERSION) {
+    const relays = payload.buildings.filter((building) => building.buildingId === "command_relay");
+    if (relays.length > 1) {
+      const keep = relays.reduce((best, relay) => relay.level > best.level ? relay : best);
+      let kept = false;
+      payload.buildings = payload.buildings.filter((building) => {
+        if (building.buildingId !== "command_relay") return true;
+        if (!kept && building.id === keep.id) { kept = true; return true; }
+        return false;
+      });
+    }
+  }
   payload.schemaVersion = COLONY_SCHEMA_VERSION;
   payload.commanderId = payload.commanderId ?? "mara_voss";
   payload.doctrineId = payload.doctrineId ?? "none";
+  payload.scoutedTargets = payload.scoutedTargets ?? [];
+  payload.completedObjectives = payload.completedObjectives ?? [];
   payload.settings = payload.settings ?? { muted: false, reducedMotion: false };
   payload.productionUpdatedAt = payload.productionUpdatedAt ?? payload.updatedAt ?? payload.createdAt;
   payload.reports = (payload.reports ?? []).map((report, index) => ({ ...report, kind: report.kind ?? "attack", attemptId: report.attemptId ?? report.id ?? `legacy-attempt-${index + 1}` }));

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, collectColonyProduction, createColony, parseColonySave, placeColonyBuilding, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { applyBattleResult, advanceColony, collectColonyProduction, commandTierOf, createColony, parseColonySave, placeColonyBuilding, recordColonyScout, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
 import { authoritativeDigest } from "./hash.js";
 
@@ -12,9 +12,11 @@ const fixture = JSON.parse(readFileSync(resolve("fixtures/battle_fixture.json"),
 describe("Orbitscar persistent colony loop", () => {
   it("creates a bounded colony, spends declarative costs, and produces extractor income", () => {
     const initial = createColony("test-player", content);
-    const placed = placeColonyBuilding(initial, "scatter_coil", { x: 120, y: 120 }, content);
+    const starter = trainUnits(initial, "line_rigger", 3, content);
+    const tierTwo = upgradeColonyBuilding(starter, "command-relay-1", content);
+    const placed = placeColonyBuilding(tierTwo, "scatter_coil", { x: 120, y: 120 }, content);
     expect(placed.buildings).toHaveLength(3);
-    expect(placed.resources.alloy).toBeLessThan(initial.resources.alloy);
+    expect(placed.resources.alloy).toBeLessThan(tierTwo.resources.alloy);
     const advanced = advanceColony(placed, 60, content);
     expect(advanced.resources.alloy).toBeGreaterThan(placed.resources.alloy);
     expect(() => placeColonyBuilding(advanced, "arc_projector", { x: 440, y: 360 }, content)).toThrow("overlaps");
@@ -52,7 +54,7 @@ describe("Orbitscar persistent colony loop", () => {
     const v3Payload = { ...oldPayload, schemaVersion: 3 };
     const legacySave = JSON.stringify({ schemaVersion: 3, payload: v3Payload, checksum: authoritativeDigest(v3Payload) });
     const migrated = parseColonySave(legacySave);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(7);
     expect(migrated.productionUpdatedAt).toBe(initial.updatedAt);
   });
 
@@ -72,11 +74,15 @@ describe("Orbitscar persistent colony loop", () => {
 
   it("allows one permanent doctrine choice and applies logistics to training costs", () => {
     const initial = createColony("test-player", content);
-    const researched = researchDoctrine(initial, "logistics", content);
+    expect(() => researchDoctrine(initial, "logistics", content)).toThrow("Command Tier 2");
+    expect(() => upgradeColonyBuilding(initial, "command-relay-1", content)).toThrow("starter force");
+    const starter = trainUnits(initial, "line_rigger", 3, content);
+    const tierTwo = upgradeColonyBuilding(starter, "command-relay-1", content);
+    const researched = researchDoctrine(tierTwo, "logistics", content);
     expect(researched.doctrineId).toBe("logistics");
     expect(researched.research).toContain("logistics");
     const trained = trainUnits(researched, "ram_walker", 1, content);
-    expect(initial.resources.alloy - researched.resources.alloy).toBe(content.doctrines.logistics.cost.alloy);
+    expect(tierTwo.resources.alloy - researched.resources.alloy).toBe(content.doctrines.logistics.cost.alloy);
     expect(researched.resources.alloy - trained.resources.alloy).toBeLessThan(content.units.ram_walker.cost.alloy);
     expect(() => researchDoctrine(researched, "power", content)).toThrow("already committed");
     expect(() => researchDoctrine(initial, "unknown", content)).toThrow("unknown doctrine");
@@ -87,7 +93,52 @@ describe("Orbitscar persistent colony loop", () => {
     const initial = createColony("test-player", content);
     const trained = trainUnits(initial, "line_rigger", 3, content);
     expect(trained.reserves.line_rigger).toBe(3);
-    expect(() => trainUnits({ ...trained, resources: { alloy: 0, volatile: 0, signal: 0 } }, "ram_walker", 1, content)).toThrow("insufficient");
+    expect(() => trainUnits({ ...trained, resources: { alloy: 0, volatile: 0, signal: 0 } }, "line_rigger", 1, content)).toThrow("insufficient");
+  });
+
+  it("uses Command Relay level to gate later units and buildings", () => {
+    const initial = createColony("test-player", content);
+    expect(() => trainUnits(initial, "needle_drone", 1, content)).toThrow("Command Tier 2");
+    expect(() => placeColonyBuilding(initial, "scatter_coil", { x: 120, y: 120 }, content)).toThrow("Command Tier 2");
+    expect(() => upgradeColonyBuilding(initial, "command-relay-1", content)).toThrow("starter force");
+    const starter = trainUnits(initial, "line_rigger", 3, content);
+    const tierTwo = upgradeColonyBuilding(starter, "command-relay-1", content);
+    expect(tierTwo.buildings.find((building) => building.id === "command-relay-1")?.level).toBe(2);
+    expect(() => placeColonyBuilding(tierTwo, "command_relay", { x: 760, y: 120 }, content)).toThrow("unique");
+    const duplicateRelays = { ...tierTwo, buildings: [...tierTwo.buildings, { id: "extra-relay", buildingId: "command_relay", position: { x: 760, y: 120 }, level: 2, health: 275 }] };
+    const { scoutedTargets: _scoutedTargets, completedObjectives: _completedObjectives, ...preObjectiveState } = duplicateRelays;
+    const legacyPayload = { ...preObjectiveState, schemaVersion: 6 };
+    const legacySave = JSON.stringify({ schemaVersion: 6, payload: legacyPayload, checksum: authoritativeDigest(legacyPayload) });
+    const migrated = parseColonySave(legacySave);
+    expect(migrated.buildings.filter((building) => building.buildingId === "command_relay")).toHaveLength(1);
+    expect(migrated.buildings.find((building) => building.buildingId === "command_relay")?.level).toBe(2);
+    expect(migrated.buildings.some((building) => building.buildingId === "matter_extractor")).toBe(true);
+    expect(migrated.resources).toEqual(duplicateRelays.resources);
+    expect(commandTierOf(migrated)).toBe(2);
+    expect(trainUnits(tierTwo, "needle_drone", 1, content).reserves.needle_drone).toBe(1);
+    expect(placeColonyBuilding(tierTwo, "scatter_coil", { x: 120, y: 120 }, content).buildings).toHaveLength(3);
+    expect(() => recordColonyScout(tierTwo, "quiet-orbit", content)).toThrow("Command Tier 3");
+    const tierThree = upgradeColonyBuilding(tierTwo, "command-relay-1", content);
+    expect(commandTierOf(tierThree)).toBe(3);
+    expect(trainUnits(tierThree, "relay_drone", 1, content).reserves.relay_drone).toBe(1);
+    expect(recordColonyScout(tierThree, "quiet-orbit", content).scoutedTargets).toContain("quiet-orbit");
+    expect(() => upgradeColonyBuilding(tierThree, "command-relay-1", content)).toThrow("maximum");
+  });
+
+  it("tracks the first-session objectives from real colony actions and persists them", () => {
+    let colony = createColony("test-player", content);
+    colony = placeColonyBuilding(colony, "arc_projector", { x: 120, y: 120 }, content);
+    expect(colony.completedObjectives).toContain("first-defense");
+    colony = trainUnits(colony, "line_rigger", 3, content);
+    expect(colony.completedObjectives).toContain("starter-force");
+    colony = recordColonyScout(colony, "cinder-yard", content);
+    expect(colony.completedObjectives).toContain("first-scout");
+    const input = parseOrbitscarBattleScenario(fixture, content);
+    const battleInput = { ...input, army: [{ unitId: "line_rigger", count: 3 }], commands: [{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 3 }] } }] };
+    const result = resolveOrbitscarBattle(battleInput);
+    colony = applyBattleResult(colony, battleInput, result, "tutorial-attack");
+    expect(colony.completedObjectives).toContain("first-sortie");
+    expect(parseColonySave(serializeColony(colony)).completedObjectives).toEqual(colony.completedObjectives);
   });
 
   it("upgrades an installed module with scaled cost and integrity", () => {
