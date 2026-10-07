@@ -35,6 +35,15 @@ describe("Orbitscar persistent colony loop", () => {
     expect(() => placeColonyBuilding(advanced, "arc_projector", { x: 440, y: 360 }, content)).toThrow("overlaps");
   });
 
+  it("limits extractor capacity to Command Tier so fresh resources cannot buy unlimited production", () => {
+    const initial = createColony("extractor-cap", content);
+    expect(() => placeColonyBuilding(initial, "matter_extractor", { x: 80, y: 80 }, content)).toThrow("extractor capacity");
+    const tierTwo = upgradeColonyBuilding(trainUnits(initial, "line_rigger", 3, content), "command-relay-1", content);
+    const second = placeColonyBuilding(tierTwo, "matter_extractor", { x: 80, y: 80 }, content);
+    expect(second.buildings.filter((building) => building.buildingId === "matter_extractor")).toHaveLength(2);
+    expect(() => placeColonyBuilding(second, "matter_extractor", { x: 160, y: 80 }, content)).toThrow("extractor capacity");
+  });
+
   it("collects only bounded elapsed-time production and caps storage", () => {
     const initial = createColony("test-player", content);
     const productionStart = Date.parse(initial.productionUpdatedAt);
@@ -164,6 +173,12 @@ describe("Orbitscar persistent colony loop", () => {
     const onFrontier = claimSectorNode(tierThree, "cinder-yard", "attacker", content);
     expect(recordColonyScout(onFrontier, "quiet-orbit", content).scoutedTargets).toContain("quiet-orbit");
     expect(() => upgradeColonyBuilding(tierThree, "command-relay-1", content)).toThrow("maximum");
+  });
+
+  it("keeps every upgrade within the level range accepted by battle snapshots", () => {
+    const initial = createColony("upgrade-cap", content);
+    const levelTwenty = { ...initial, resources: { alloy: 1_000_000, volatile: 1_000_000, signal: 1_000_000 }, buildings: initial.buildings.map((building) => building.id === "matter-extractor-1" ? { ...building, level: 20, health: content.buildings.matter_extractor.maxHealth * 5.75 } : building) };
+    expect(() => upgradeColonyBuilding(levelTwenty, "matter-extractor-1", content)).toThrow("maximum level");
   });
 
   it("tracks the first-session objectives from real colony actions and persists them", () => {

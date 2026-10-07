@@ -16,10 +16,11 @@ export async function boot(page: Page): Promise<void> {
 
 /** The app re-renders its DOM after every action, so every click resolves a fresh locator. */
 export async function act(page: Page, action: string): Promise<void> {
-  const button = page.locator(`[data-action="${action}"]`);
+  const button = page.locator(`[data-action="${action}"]`).last();
   await button.waitFor({ state: "attached" });
   await expect(button).toBeEnabled();
   await button.click();
+  await expect(page.locator(".shell")).toHaveAttribute("data-authority-busy", "false");
 }
 
 /** Navigate via the top bar; nav actions collide with same-action content buttons. */
@@ -27,6 +28,7 @@ export async function navTo(page: Page, mode: "colony" | "targets" | "army"): Pr
   const button = page.locator(`.nav [data-action="${mode}"]`);
   await button.waitFor({ state: "attached" });
   await button.click();
+  await expect(page.locator(".shell")).toHaveAttribute("data-authority-busy", "false");
 }
 
 /** Canvas mapping: camera centers the arena and zooms to fit; match scene.ts behavior. */

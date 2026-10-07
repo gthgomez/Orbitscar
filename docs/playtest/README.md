@@ -15,9 +15,11 @@ fabricated. Do not record session data until sessions actually happen.
 - Deterministic balance gates are active by default and passed after the
   ruleset 0.3.0 spatial-navigation changes. They guard selected absolute
   failures; aggregate strategy parity remains unproven.
-- The current V1 browser-certification phase has not run. Its scope is in
-  `docs/campaign/full-game/PLAN.md` and must use a production build after the
-  browser-free gates are complete.
+- V1 automated browser certification passed 14/14 against a production build.
+  The expanded suite covers onboarding, economy, progression, raids,
+  authority/rival attacks, live commands, migration, accessibility, and mobile
+  touch placement; see `docs/campaign/full-game/STATUS.md` for evidence.
+  Automation does not replace blind human sessions.
 
 ## What only humans can answer (vertical-slice item 10)
 

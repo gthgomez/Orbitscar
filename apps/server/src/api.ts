@@ -8,6 +8,7 @@ import { parseOrbitscarContent, type OrbitscarContent } from "@orbitscar/content
 import {
   applyBattleResult,
   applyColonyDefenseResult,
+  assertCommandsBeforeTerminal,
   claimRivalSectorNode,
   getSectorNodeState,
   SECTOR_NODES,
@@ -423,6 +424,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const validation = validateOrbitscarInput(input);
         if (!validation.ok) throw new ApiError(400, validation.errors.join("; "));
         const result = resolveOrbitscarBattle(input);
+        try { assertCommandsBeforeTerminal(input, result.durationTicks); } catch (error) { throw new ApiError(400, error instanceof Error ? error.message : "battle command occurs after battle end"); }
         const settled = applyBattleResult(state, input, result, idempotencyId, targetId);
         const response = { profileId: id, version: expectedVersion + 1, colony: settled, attemptId: idempotencyId, targetId, input, result, sector: settled.sector };
         const next = structuredClone(database);
@@ -503,6 +505,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const validation = validateOrbitscarInput(input);
         if (!validation.ok) throw new ApiError(400, validation.errors.join("; "));
         const result = resolveOrbitscarBattle(input);
+        try { assertCommandsBeforeTerminal(input, result.durationTicks); } catch (error) { throw new ApiError(400, error instanceof Error ? error.message : "battle command occurs after battle end"); }
         let settledAttacker = applyBattleResult(attackerState, input, result, attackId);
         if (sectorNodeId !== undefined) settledAttacker = claimRivalSectorNode(settledAttacker, sectorNodeId, defenderId, result.winner, gameContent);
         let settledDefender = applyColonyDefenseResult(defenderState, input, result, attackId, atMs);

@@ -47,15 +47,18 @@ let battleAuthorityProfileId: string | undefined;
 let battleRivalProfileId: string | undefined;
 let battleRivalNodeId: string | undefined;
 let battleRivalSnapshot: AuthoritySnapshot | undefined;
+let lastActiveBattlePersistAt = 0;
 
 function refresh(): void { renderApp({ root, content, colony, selectedTarget, selectedBuildingId, buildMode, notice, session, selectedCommanderTargetId, authority: { profileId: authorityProfileId, version: authorityVersion, panelOpen: authorityPanelOpen, busy: authorityBusy, sector: authoritySector, rivalSnapshot: authorityRivalSnapshot } }); }
-function persistActiveBattle(): void {
+function persistActiveBattle(throttled = false): void {
   const replay = session.replay;
   if (!replay) return;
+  const persistedAt = Date.now();
+  if (throttled && persistedAt - lastActiveBattlePersistAt < 1000) return;
   const body: ActiveBattleSave = { schemaVersion: 1, kind: replay.kind ?? "attack", attemptId: replay.attemptId, targetId: selectedTarget.id, input: replay.input, currentTick: replay.currentTick ?? 0, selectedZone: session.plan.selectedZone, ...(battleAuthorityProfileId === undefined ? {} : { authorityProfileId: battleAuthorityProfileId }), ...(battleAuthorityVersion === undefined ? {} : { authorityVersion: battleAuthorityVersion }), ...(battleRivalProfileId === undefined ? {} : { rivalProfileId: battleRivalProfileId }), ...(battleRivalNodeId === undefined ? {} : { rivalNodeId: battleRivalNodeId }), ...(battleRivalSnapshot === undefined ? {} : { rivalSnapshot: battleRivalSnapshot }) };
-  try { localStorage.setItem(activeBattleKey, JSON.stringify({ ...body, checksum: authoritativeDigest(body) })); } catch { notice = "Active battle could not be saved in this browser."; }
+  try { localStorage.setItem(activeBattleKey, JSON.stringify({ ...body, checksum: authoritativeDigest(body) })); lastActiveBattlePersistAt = persistedAt; } catch { notice = "Active battle could not be saved in this browser."; }
 }
-function clearActiveBattle(): void { try { localStorage.removeItem(activeBattleKey); } catch { /* local persistence may be unavailable */ } }
+function clearActiveBattle(): void { lastActiveBattlePersistAt = 0; try { localStorage.removeItem(activeBattleKey); } catch { /* local persistence may be unavailable */ } }
 function restoreActiveBattle(): void {
   try {
     const serialized = localStorage.getItem(activeBattleKey);
@@ -236,7 +239,7 @@ function stageWave(): void {
 function createBattleInput(seed: number): OrbitscarBattleInput {
   const firstWave = session.plan.waves[0];
   const commands: OrbitscarBattleInput["commands"] = firstWave ? [{ commandId: "wave-1", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: firstWave.zone, position: { ...zonePositions[firstWave.zone] }, units: firstWave.units } }] : [];
-  return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: colony.commanderId, attackerDoctrineId: colony.doctrineId, rewardPreview: sectorRewardPreview(colony, selectedTarget.id, content), army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
+  return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: colony.commanderId, attackerDoctrineId: colony.doctrineId, rewardPreview: authorityRivalSnapshot ? {} : sectorRewardPreview(colony, selectedTarget.id, content), army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
 }
 
 function activeBattleTick(replay: NonNullable<GameSession["replay"]>): number {
@@ -254,7 +257,7 @@ function appendLiveCommand(command: OrbitscarBattleInput["commands"][number]): v
   if (!replay || replay.done || replay.kind === "defense" || replay.archived || colony.reports.some((report) => report.attemptId === replay.attemptId)) return;
   const tick = activeBattleTick(replay);
   try {
-    const input = appendOrbitscarCommand(replay.input, command, tick);
+    const input = appendOrbitscarCommand(replay.input, command, tick, replay.result.durationTicks);
     const result = resolveOrbitscarBattle(input);
     session = { ...session, replay: replayToTick(replay, tick, input, result) };
     if (!colony.reports.some((report) => report.attemptId === replay.attemptId)) persistActiveBattle();
@@ -413,7 +416,7 @@ function onFrame(now: number): void {
   }
   const currentTick = Math.min(replay.input.maxDurationTicks, elapsedTicks);
   const done = currentTick >= replay.result.durationTicks;
-  if (eventIndex !== replay.eventIndex || done !== replay.done || currentTick !== replay.currentTick) { session = { ...session, replay: { ...replay, eventIndex, done, currentTick } }; if (eventIndex !== replay.eventIndex && !colony.reports.some((report) => report.attemptId === replay.attemptId)) persistActiveBattle(); if (eventIndex !== replay.eventIndex || done) { if (currentTick - lastUiReplayTick >= 15 || done) { lastUiReplayTick = Math.min(currentTick, replay.result.durationTicks); refresh(); } } }
+  if (eventIndex !== replay.eventIndex || done !== replay.done || currentTick !== replay.currentTick) { session = { ...session, replay: { ...replay, eventIndex, done, currentTick } }; if (eventIndex !== replay.eventIndex && !colony.reports.some((report) => report.attemptId === replay.attemptId)) persistActiveBattle(true); if (eventIndex !== replay.eventIndex || done) { if (currentTick - lastUiReplayTick >= 15 || done) { lastUiReplayTick = Math.min(currentTick, replay.result.durationTicks); refresh(); } } }
 }
 
 function handleAction(action: string): void {
@@ -461,7 +464,7 @@ function handleAction(action: string): void {
   if (action === "simulate-raid") { if (authorityProfileId) { setNotice("Incoming raid simulation is available in solo mode; rival attacks use the authority-backed base snapshot."); return; } startColonyRaid(); return; }
   if (action === "toggle-readability") { colony = { ...colony, settings: { ...colony.settings, reducedMotion: !colony.settings.reducedMotion } }; saveColony(colony.settings.reducedMotion ? "Low-effects readability mode on: calmer tactical updates, all gameplay information preserved." : "Standard effects restored."); return; }
   if (action === "toggle-audio") { colony = { ...colony, settings: { ...colony.settings, muted: !colony.settings.muted } }; saveColony(colony.settings.muted ? "Sound muted." : "Sound enabled."); return; }
-  if (verb === "scout" && value && content.encounters[value] && content.encounters[value].requiredTier <= commandTierOf(colony)) { if (authorityProfileId) { void applyAuthorityAction({ type: "SCOUT", targetId: value }, `${content.encounters[value].name} intel recorded by the authority.`); return; } try { selectedTarget = content.encounters[value]; colony = recordColonyScout(colony, value, content); saveColony(`${selectedTarget.name} intel recorded.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Scouting failed."); } return; }
+  if (verb === "scout" && value && content.encounters[value] && content.encounters[value].requiredTier <= commandTierOf(colony)) { selectedTarget = content.encounters[value]; if (authorityProfileId) { void applyAuthorityAction({ type: "SCOUT", targetId: value }, `${selectedTarget.name} intel recorded by the authority.`); return; } try { colony = recordColonyScout(colony, value, content); saveColony(`${selectedTarget.name} intel recorded.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Scouting failed."); } return; }
   if (verb === "train" && value) { if (authorityProfileId) { void applyAuthorityAction({ type: "TRAIN", unitId: value, count: 1 }, `${displayName(value)} added to reserves.`); return; } try { colony = trainUnits(colony, value, 1, content); saveColony(`${displayName(value)} added to reserves.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Training failed."); } return; }
   if (verb === "build" && value && content.buildings[value]) { buildMode = value; selectedBuildingId = undefined; setNotice(`Placement mode: ${displayName(value)}. Tap an open grid cell.`); return; }
   if (verb === "select-building" && value) { selectedBuildingId = value; notice = `${displayName(colony.buildings.find((building) => building.id === value)?.buildingId ?? value)} selected.`; refresh(); return; }

@@ -5,7 +5,7 @@ import { parseOrbitscarContent } from "@orbitscar/content";
 import { applyColonyDefenseResult, createColony, parseColonySave, placeColonyBuilding, repairColonyBuilding, researchDoctrine, selectColonyCommander, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { authoritativeDigest } from "./hash.js";
 import { buildColonyRaidInput } from "./raid.js";
-import { resolveOrbitscarBattle } from "./orbitscar.js";
+import { resolveOrbitscarBattle, validateOrbitscarInput } from "./orbitscar.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
 
@@ -65,6 +65,14 @@ describe("colony raid loop", () => {
     expect(first.events.some((event) => event.type === "defense_fired")).toBe(true);
     const altered = { ...colony, buildings: colony.buildings.map((building) => building.id === "scatter_coil-3" ? { ...building, position: { x: 900, y: 700 } } : building) };
     expect(resolveOrbitscarBattle(buildColonyRaidInput(altered, "scavenger_swarm", 40, content)).baseSnapshotHash).not.toBe(first.baseSnapshotHash);
+  });
+
+  it("keeps the highest permitted module upgrade valid in a raid snapshot", () => {
+    const colony = createColony("max-module", content);
+    const maxed = { ...colony, buildings: colony.buildings.map((building) => building.id === "matter-extractor-1" ? { ...building, level: 20, health: content.buildings.matter_extractor.maxHealth * 5.75 } : building) };
+    const input = buildColonyRaidInput(maxed, "scavenger_swarm", 908, content);
+    expect(validateOrbitscarInput(input).ok).toBe(true);
+    expect(resolveOrbitscarBattle(input).canonicalHash).toBeTruthy();
   });
 
   it("uses the colony's selected commander in deterministic defense snapshots", () => {

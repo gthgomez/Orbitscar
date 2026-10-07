@@ -2,6 +2,7 @@ import type { OrbitscarContent, OrbitscarTargetPriority, OrbitscarTargetTag } fr
 import { authoritativeDigest, canonicalSerialize, fastStateHash } from "./hash.js";
 
 export const CANONICAL_FORMAT_VERSION = 2;
+export const MAX_STRUCTURE_LEVEL = 20;
 export type OrbitscarPosition = { x: number; y: number };
 export type OrbitscarArena = { width: number; height: number };
 export type OrbitscarArmyEntry = { unitId: string; count: number };
@@ -133,7 +134,7 @@ export function validateOrbitscarInput(input: OrbitscarBattleInput): OrbitscarVa
   if (input.commands.some((command) => !isInteger(command.sequence) || command.sequence < 0)) errors.push("command sequence must be a non-negative integer"); if (input.commands.some((command) => !isInteger(command.tick) || command.tick < 0 || command.tick > input.maxDurationTicks)) errors.push("command tick is outside the battle window"); if (deployCommands.length > input.maxDeploymentCharges) errors.push("deployment charge limit exceeded"); if (abilityCommands.length > (content.commanders[input.commanderId]?.charges ?? 0)) errors.push("commander ability charge limit exceeded");
   for (const entry of input.army) { if (!content.units[entry.unitId]) errors.push(`army references unknown unit '${entry.unitId}'`); if (!isInteger(entry.count) || entry.count < 0) errors.push(`army count for '${entry.unitId}' must be a non-negative integer`); }
   if (input.army.reduce((total, entry) => total + (isInteger(entry.count) && entry.count > 0 ? entry.count : 0), 0) > MAX_BATTLE_UNITS) errors.push(`army exceeds ${MAX_BATTLE_UNITS} unit simulation limit`);
-  for (const structure of input.structures) { const building = content.buildings[structure.buildingId]; if (!building) errors.push(`structure '${structure.id}' references unknown building '${structure.buildingId}'`); if (!validPosition(structure.position, input.arena)) errors.push(`structure '${structure.id}' has an invalid position`); if (structure.level !== undefined && (!isInteger(structure.level) || structure.level < 1 || structure.level > 20)) errors.push(`structure '${structure.id}' has invalid level`); const structureMaxHealth = building === undefined ? 0 : building.maxHealth * (1 + ((structure.level ?? 1) - 1) * 0.25); if (structure.currentHealth !== undefined && (!Number.isFinite(structure.currentHealth) || structure.currentHealth < 0 || structure.currentHealth > structureMaxHealth)) errors.push(`structure '${structure.id}' has invalid currentHealth`); }
+  for (const structure of input.structures) { const building = content.buildings[structure.buildingId]; if (!building) errors.push(`structure '${structure.id}' references unknown building '${structure.buildingId}'`); if (!validPosition(structure.position, input.arena)) errors.push(`structure '${structure.id}' has an invalid position`); if (structure.level !== undefined && (!isInteger(structure.level) || structure.level < 1 || structure.level > MAX_STRUCTURE_LEVEL)) errors.push(`structure '${structure.id}' has invalid level`); const structureMaxHealth = building === undefined ? 0 : building.maxHealth * (1 + ((structure.level ?? 1) - 1) * 0.25); if (structure.currentHealth !== undefined && (!Number.isFinite(structure.currentHealth) || structure.currentHealth < 0 || structure.currentHealth > structureMaxHealth)) errors.push(`structure '${structure.id}' has invalid currentHealth`); }
   const reserves = new Map(input.army.map((entry) => [entry.unitId, entry.count]));
   for (const command of input.commands) {
     if (command.type === "DEPLOY") {
@@ -175,8 +176,10 @@ export function validateOrbitscarInput(input: OrbitscarBattleInput): OrbitscarVa
 }
 
 /** Append one deterministic live command after the simulation has advanced to currentTick. */
-export function appendOrbitscarCommand(input: OrbitscarBattleInput, command: OrbitscarCommand, currentTick: number): OrbitscarBattleInput {
+export function appendOrbitscarCommand(input: OrbitscarBattleInput, command: OrbitscarCommand, currentTick: number, terminalTick = input.maxDurationTicks): OrbitscarBattleInput {
   if (!isInteger(currentTick) || currentTick < 0 || currentTick >= input.maxDurationTicks) throw new Error("current tick is outside the active battle window");
+  if (!isInteger(terminalTick) || terminalTick < 0 || terminalTick > input.maxDurationTicks) throw new Error("terminal tick is outside the battle window");
+  if (terminalTick < input.maxDurationTicks && (currentTick >= terminalTick || command.tick >= terminalTick)) throw new Error("battle has ended; no further commands are accepted");
   const existingValidation = validateOrbitscarInput(input);
   if (!existingValidation.ok) throw new Error(`INVALID_BATTLE_INPUT: ${existingValidation.errors.join(", ")}`);
   const canonical = canonicalizeOrbitscarInput(input);
@@ -190,6 +193,12 @@ export function appendOrbitscarCommand(input: OrbitscarBattleInput, command: Orb
   const validation = validateOrbitscarInput(next);
   if (!validation.ok) throw new Error(`INVALID_BATTLE_COMMAND: ${validation.errors.join(", ")}`);
   return next;
+}
+
+/** Reject commands that the deterministic resolver would never reach after an early terminal state. */
+export function assertCommandsBeforeTerminal(input: Pick<OrbitscarBattleInput, "commands" | "maxDurationTicks">, terminalTick: number): void {
+  if (!isInteger(terminalTick) || terminalTick < 0 || terminalTick > input.maxDurationTicks) throw new Error("terminal tick is outside the battle window");
+  if (terminalTick < input.maxDurationTicks && input.commands.some((command) => command.tick >= terminalTick)) throw new Error("battle command is scheduled after the battle ended");
 }
 
 export function calculateOrbitscarReward(input: Pick<OrbitscarBattleInput, "rewardPreview" | "structures" | "content">, destroyedStructureIds: readonly string[]): Record<string, number> {

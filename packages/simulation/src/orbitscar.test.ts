@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { appendOrbitscarCommand, authoritativeDigest, calculateOrbitscarReward, canonicalSerialize, hashOrbitscarCanonicalInput, parseOrbitscarBattleScenario, resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarCommand } from "./orbitscar.js";
+import { appendOrbitscarCommand, assertCommandsBeforeTerminal, authoritativeDigest, calculateOrbitscarReward, canonicalSerialize, hashOrbitscarCanonicalInput, parseOrbitscarBattleScenario, resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarCommand } from "./orbitscar.js";
 import { sha256Hex } from "./hash.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
@@ -168,6 +168,15 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(() => appendOrbitscarCommand(initial, { ...reinforcement, tick: 60 }, 60)).toThrow("stale");
     expect(() => appendOrbitscarCommand(initial, { ...reinforcement, sequence: 1 }, 90)).toThrow("sequence");
     expect(() => appendOrbitscarCommand(initial, { ...reinforcement, tick: 150 }, 90)).toThrow("ahead");
+  });
+
+  it("rejects commands scheduled after an already terminal battle tick", () => {
+    const first = { commandId: "first", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 2 }] } };
+    const initial = inputWith([first], { army: [{ unitId: "line_rigger", count: 2 }], maxDurationTicks: 2400 });
+    const completed = resolveOrbitscarBattle(initial);
+    const late = { commandId: "late", sequence: 2, tick: completed.durationTicks, type: "DEPLOY" as const, payload: { zone: "north" as const, position: { x: 400, y: 100 }, units: [{ unitId: "line_rigger", count: 1 }] } };
+    expect(() => appendOrbitscarCommand(initial, late, completed.durationTicks - 1, completed.durationTicks)).toThrow("battle has ended");
+    expect(() => assertCommandsBeforeTerminal({ commands: [late], maxDurationTicks: initial.maxDurationTicks }, completed.durationTicks)).toThrow("scheduled after the battle ended");
   });
 
   it("telegraphs a defense target and holds that target through its first shot", () => {

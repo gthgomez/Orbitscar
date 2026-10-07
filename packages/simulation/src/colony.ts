@@ -1,4 +1,5 @@
 import type { OrbitscarBattleInput, OrbitscarBattleResult, OrbitscarPosition } from "./orbitscar.js";
+import { MAX_STRUCTURE_LEVEL } from "./orbitscar.js";
 import type { OrbitscarContent, OrbitscarResourceBundle } from "@orbitscar/content";
 import { authoritativeDigest, canonicalSerialize } from "./hash.js";
 import { claimSectorNode, getSectorNodeState, SECTOR_NODES } from "./sector.js";
@@ -85,6 +86,7 @@ export function researchDoctrine(state: ColonyState, doctrineId: string, content
 
 export function placeColonyBuilding(state: ColonyState, buildingId: string, position: OrbitscarPosition, content: OrbitscarContent, atMs = Date.now()): ColonyState {
   state = settleColonyProduction(state, atMs, content);
+  if (buildingId === "matter_extractor" && state.buildings.filter((building) => building.buildingId === "matter_extractor").length >= commandTierOf(state)) throw new Error(`extractor capacity reached for Command Tier ${commandTierOf(state)}`);
   const definition = content.buildings[buildingId]; if (buildingId === "command_relay" && state.buildings.some((building) => building.buildingId === "command_relay")) throw new Error("Command Relay is unique to this colony"); if (!definition) throw new Error(`unknown building '${buildingId}'`); if (definition.requiredTier > commandTierOf(state)) throw new Error(`building requires Command Tier ${definition.requiredTier}`); if (position.x < 0 || position.y < 0 || position.x + definition.footprint[0] * 40 > 1200 || position.y + definition.footprint[1] * 40 > 800) throw new Error("building is outside colony bounds"); if (state.buildings.some((building) => overlap(building, { id: "candidate", buildingId, position, level: 1, health: definition.maxHealth }, content))) throw new Error("building overlaps an existing structure"); if (!canAfford(state.resources, definition.cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, definition.cost); next.buildings.push({ id: `${buildingId}-${next.buildings.length + 1}`, buildingId, position: { ...position }, level: 1, health: definition.maxHealth }); if (definition.defenseId) markObjective(next, "first-defense"); next.updatedAt = now(); return next;
 }
 
@@ -98,6 +100,7 @@ export function upgradeColonyBuilding(state: ColonyState, buildingId: string, co
   const definition = content.buildings[existing.buildingId];
   if (existing.buildingId === "command_relay" && existing.level >= 3) throw new Error("Command Tier is already at maximum");
   if (!definition) throw new Error(`unknown building '${existing.buildingId}'`);
+  if (existing.level >= MAX_STRUCTURE_LEVEL) throw new Error(`module is already at the maximum level ${MAX_STRUCTURE_LEVEL}`);
   const cost: OrbitscarResourceBundle = Object.fromEntries(Object.entries(definition.cost).map(([resourceId, amount]) => [resourceId, Math.ceil(amount * (1 + existing.level * 0.5))]));
   if (!canAfford(state.resources, cost)) throw new Error("insufficient resources");
   const next = clone(state);
