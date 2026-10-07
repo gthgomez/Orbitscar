@@ -347,4 +347,21 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(result.loot).toEqual({});
     expect(result.events.some((event) => event.type === "battle_ended")).toBe(true);
   });
+
+  it("does not award resource salvage when the force retreats after destroying an extractor", () => {
+    const input = inputWith([
+      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 360 }, units: [{ unitId: "pulse_marksman", count: 8 }] } },
+      { commandId: "retreat", sequence: 2, tick: 1, type: "RETREAT", payload: {} },
+    ], {
+      army: [{ unitId: "pulse_marksman", count: 8 }],
+      structures: [
+        { id: "relay", buildingId: "command_relay", position: { x: 900, y: 360 } },
+        { id: "extractor", buildingId: "matter_extractor", position: { x: 240, y: 360 }, currentHealth: 1 },
+      ],
+    });
+    const result = resolveOrbitscarBattle(input);
+    expect(result.retreated).toBe(true);
+    expect(result.destroyedStructureIds).toContain("extractor");
+    expect(result.loot).toEqual({});
+  });
 });

@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { createColony, recordColonyScout } from "@orbitscar/simulation";
-import { createGameSession } from "../state/game-session.js";
+import { createColony, parseOrbitscarBattleScenario, recordColonyScout, resolveOrbitscarBattle, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { createGameSession, type GameSession } from "../state/game-session.js";
 import { renderApp, type RenderContext } from "./render.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
@@ -60,5 +60,44 @@ describe("first-session UI and scouting", () => {
     const html = render({ colony, session });
     expect(html).toContain("Vulnerable to Scatter Coil");
     expect(html).toContain("Vulnerable to Arc Projector");
+  });
+
+  it("shows event-derived casualties, disabled defenses, and salvage during a live attack", () => {
+    const fixture = JSON.parse(readFileSync(resolve("fixtures/battle_fixture.json"), "utf8"));
+    const base = parseOrbitscarBattleScenario(fixture, content);
+    const input: OrbitscarBattleInput = {
+      ...base,
+      maxDurationTicks: 100,
+      deploymentCapacity: 10,
+      army: [{ unitId: "pulse_marksman", count: 8 }],
+      rewardPreview: { alloy: 36, volatile: 14, signal: 6 },
+      structures: [
+        { id: "relay", buildingId: "command_relay", position: { x: 900, y: 360 } },
+        { id: "extractor", buildingId: "matter_extractor", position: { x: 240, y: 360 }, currentHealth: 1 },
+        { id: "arc", buildingId: "arc_projector", position: { x: 450, y: 360 } },
+      ],
+      commands: [
+        { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 360 }, units: [{ unitId: "pulse_marksman", count: 8 }] } },
+      ],
+    };
+    const result = resolveOrbitscarBattle(input);
+    const eventIndex = result.events.findIndex((event) => event.type === "defense_destroyed" && event.entityId === "extractor") + 1;
+    const session: GameSession = {
+      ...createGameSession(),
+      mode: "battle" as const,
+      plan: { ...createGameSession().plan, selectedArmy: { pulse_marksman: 8 }, waveDraft: { pulse_marksman: 0 } },
+      replay: { kind: "attack" as const, input, result, attemptId: "live-readout", startedAt: 0, eventIndex, done: false },
+    };
+    const html = render({ colony: createColony("readout", content), session });
+    expect(html).toContain("Confirmed casualties: 0");
+    expect(html).toContain("Defenses disabled: 0");
+    expect(html).toContain("Salvage potential: Alloy 36 · Volatile 14 · Signal 6");
+
+    const retreatInput: OrbitscarBattleInput = { ...input, commands: [...input.commands, { commandId: "retreat", sequence: 2, tick: 1, type: "RETREAT", payload: {} }] };
+    const retreatResult = resolveOrbitscarBattle(retreatInput);
+    const retreatSession: GameSession = { ...session, replay: { ...session.replay!, input: retreatInput, result: retreatResult } };
+    const retreatHtml = render({ colony: createColony("retreat-readout", content), session: retreatSession });
+    expect(retreatHtml).toContain("Salvage on withdrawal: none");
+    expect(retreatHtml).not.toContain("Alloy 36 · Volatile 14 · Signal 6");
   });
 });

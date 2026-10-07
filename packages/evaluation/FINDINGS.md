@@ -266,6 +266,23 @@ the same run count and seed base before changing the content ruleset; artifacts
 are retained locally under `runs/eval-2026-10-07-snare-baseline-08` and
 `runs/eval-2026-10-07-snare-final-v2`.
 
+## Retreat settlement and live battle ledger — ruleset 0.10.0
+
+Retreat now produces an empty loot bundle even if the force destroyed a
+resource structure before withdrawing. This closes a reward mismatch between
+the combat outcome and the intended no-salvage retreat rule; local and
+authority settlement both consume the resolver's result. The regression uses
+an extractor destroyed on tick 0 and a retreat command on tick 1, then checks
+the recorded loot is empty. The ruleset version was advanced because this
+changes deterministic outcomes and replay hashes.
+
+During an attack, the live readout counts casualties and disabled defense
+structures from events already shown in the replay. Its salvage estimate uses
+the shared reward function and only structures already destroyed. It is
+labeled potential while the sortie is active and explicitly says there is no
+salvage after withdrawal. Render tests cover both states. The estimate is
+recorded state, not a counterfactual prediction.
+
 **Multiple viable approaches — YES.** Against the introductory target
 (cinder-yard), at least three archetypes win reliably: screen-line (100%),
 air-harass (75%), anti-armor-punch (78%). sabotage-strike is a situational
