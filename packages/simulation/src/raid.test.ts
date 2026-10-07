@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding, selectColonyCommander } from "./colony.js";
+import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding, researchDoctrine, selectColonyCommander } from "./colony.js";
 import { buildColonyRaidInput } from "./raid.js";
 import { resolveOrbitscarBattle } from "./orbitscar.js";
 
@@ -26,6 +26,25 @@ describe("colony raid loop", () => {
     const input = buildColonyRaidInput(colony, "signal_harvest", 43, content);
     expect(input.commanderId).toBe("ion_kade");
     expect(input.commands[0].type).toBe("DEPLOY");
+  });
+
+  it("applies the colony defense doctrine to installed structure durability and fire", () => {
+    const built = placeColonyBuilding(createColony("defender", content), "arc_projector", { x: 600, y: 320 }, content);
+    const base = { ...built, buildings: built.buildings.map((building) => building.id === "command-relay-1" ? { ...building, health: 100 } : building) };
+    const specialized = researchDoctrine(base, "defense", content);
+    const plainInput = buildColonyRaidInput(base, "breach_column", 77, content);
+    const defendedInput = buildColonyRaidInput(specialized, "breach_column", 77, content);
+    const plain = resolveOrbitscarBattle(plainInput);
+    const defended = resolveOrbitscarBattle(defendedInput);
+    expect(defendedInput.defenderDoctrineId).toBe("defense");
+    expect(defended.canonicalHash).not.toBe(plain.canonicalHash);
+    const plainFire = plain.events.find((event) => event.type === "defense_fired");
+    const doctrineFire = defended.events.find((event) => event.type === "defense_fired");
+    expect(doctrineFire?.value).toBeGreaterThan(plainFire?.value ?? 0);
+    const settlement = applyColonyDefenseResult(specialized, defendedInput, defended, "defense-doctrine-settlement", 1_800_000_000_000);
+    const relayDamage = defended.damageByEntity["command-relay-1"] ?? 0;
+    const relayAfter = settlement.buildings.find((building) => building.id === "command-relay-1")?.health;
+    expect(relayAfter).toBeCloseTo(Math.max(0, 100 - relayDamage / content.doctrines.defense.defenseHealthMultiplier));
   });
 
   it("settles raid damage once and lets the owner repair a disabled structure", () => {

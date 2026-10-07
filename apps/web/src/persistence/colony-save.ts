@@ -11,7 +11,7 @@ export function loadColony(content: OrbitscarContent): ColonyState {
     const saved = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey) ?? window.localStorage.getItem(olderStorageKey) ?? window.localStorage.getItem(oldestStorageKey);
     if (saved === null) return createColony("local-player", content);
     const colony = parseColonySave(saved);
-    return content.commanders[colony.commanderId] ? colony : { ...colony, commanderId: "mara_voss" };
+    return { ...colony, commanderId: content.commanders[colony.commanderId] ? colony.commanderId : "mara_voss", doctrineId: content.doctrines[colony.doctrineId] ? colony.doctrineId : "none" };
   } catch {
     return createColony("local-player", content);
   }

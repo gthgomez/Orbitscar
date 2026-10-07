@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, collectColonyProduction, createColony, parseColonySave, placeColonyBuilding, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { applyBattleResult, advanceColony, collectColonyProduction, createColony, parseColonySave, placeColonyBuilding, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
 import { authoritativeDigest } from "./hash.js";
 
@@ -52,7 +52,7 @@ describe("Orbitscar persistent colony loop", () => {
     const v3Payload = { ...oldPayload, schemaVersion: 3 };
     const legacySave = JSON.stringify({ schemaVersion: 3, payload: v3Payload, checksum: authoritativeDigest(v3Payload) });
     const migrated = parseColonySave(legacySave);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated.productionUpdatedAt).toBe(initial.updatedAt);
   });
 
@@ -68,6 +68,19 @@ describe("Orbitscar persistent colony loop", () => {
     const v4Payload = { ...legacyPayload, schemaVersion: 4 };
     const legacySave = JSON.stringify({ schemaVersion: 4, payload: v4Payload, checksum: authoritativeDigest(v4Payload) });
     expect(parseColonySave(legacySave).commanderId).toBe("mara_voss");
+  });
+
+  it("allows one permanent doctrine choice and applies logistics to training costs", () => {
+    const initial = createColony("test-player", content);
+    const researched = researchDoctrine(initial, "logistics", content);
+    expect(researched.doctrineId).toBe("logistics");
+    expect(researched.research).toContain("logistics");
+    const trained = trainUnits(researched, "ram_walker", 1, content);
+    expect(initial.resources.alloy - researched.resources.alloy).toBe(content.doctrines.logistics.cost.alloy);
+    expect(researched.resources.alloy - trained.resources.alloy).toBeLessThan(content.units.ram_walker.cost.alloy);
+    expect(() => researchDoctrine(researched, "power", content)).toThrow("already committed");
+    expect(() => researchDoctrine(initial, "unknown", content)).toThrow("unknown doctrine");
+    expect(parseColonySave(serializeColony(researched)).doctrineId).toBe("logistics");
   });
 
   it("trains persistent reserves and rejects unaffordable batches", () => {

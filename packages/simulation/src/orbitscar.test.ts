@@ -64,6 +64,18 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(coilImpacts.map((event) => event.entityId)).toContain("line_rigger#0");
   });
 
+  it("records doctrines in the canonical snapshot and applies their combat specialization", () => {
+    const drop = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } };
+    const army = [{ unitId: "line_rigger", count: 4 }];
+    const baseline = resolveOrbitscarBattle(inputWith([drop], { army, maxDurationTicks: 1000 }));
+    const poweredInput = inputWith([drop], { army, attackerDoctrineId: "power", maxDurationTicks: 1000 });
+    const powered = resolveOrbitscarBattle(poweredInput);
+    expect(powered.canonicalHash).not.toBe(baseline.canonicalHash);
+    expect(powered.damageByEntity.relay).toBeGreaterThan(baseline.damageByEntity.relay);
+    const breach = resolveOrbitscarBattle(inputWith([drop], { army, attackerDoctrineId: "breach", maxDurationTicks: 1000 }));
+    expect(breach.damageByEntity.arc).toBeGreaterThan(baseline.damageByEntity.arc);
+  });
+
   it("keeps identical seeds stable while allowing a different seed to alter stochastic damage", () => {
     const first = resolveOrbitscarBattle(inputWith(baseCommands, { seed: 17 }));
     const repeated = resolveOrbitscarBattle(inputWith(baseCommands, { seed: 17 }));

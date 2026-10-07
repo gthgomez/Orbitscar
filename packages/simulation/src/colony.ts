@@ -2,13 +2,13 @@ import type { OrbitscarBattleInput, OrbitscarBattleResult, OrbitscarPosition } f
 import type { OrbitscarContent, OrbitscarResourceBundle } from "@orbitscar/content";
 import { authoritativeDigest, canonicalSerialize } from "./hash.js";
 
-export const COLONY_SCHEMA_VERSION = 5;
+export const COLONY_SCHEMA_VERSION = 6;
 export const MAX_ECONOMY_CATCHUP_MS = 4 * 60 * 60 * 1000;
 export const RESOURCE_CAPS: Readonly<Record<string, number>> = { alloy: 600, volatile: 300, signal: 240 };
 export type ColonyBuilding = { id: string; buildingId: string; position: OrbitscarPosition; level: number; health: number };
 export type ColonyReport = { id: string; attemptId: string; createdAt: string; kind: "attack" | "defense"; input?: OrbitscarBattleInput; result: OrbitscarBattleResult };
 export const MAX_COLONY_REPORTS = 50;
-export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; commanderId: string; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
+export type ColonyState = { schemaVersion: number; playerId: string; createdAt: string; updatedAt: string; productionUpdatedAt: string; resources: Record<string, number>; buildings: ColonyBuilding[]; reserves: Record<string, number>; research: string[]; doctrineId: string; commanderId: string; reports: ColonyReport[]; settings: { muted: boolean; reducedMotion: boolean } };
 export type ColonySave = { schemaVersion: number; payload: ColonyState; checksum: string };
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
@@ -20,13 +20,26 @@ function overlap(a: ColonyBuilding, b: ColonyBuilding, content: OrbitscarContent
 
 export function createColony(playerId: string, content: OrbitscarContent): ColonyState {
   const timestamp = now();
-  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], commanderId: "mara_voss", reports: [], settings: { muted: false, reducedMotion: false } };
+  return { schemaVersion: COLONY_SCHEMA_VERSION, playerId, createdAt: timestamp, updatedAt: timestamp, productionUpdatedAt: timestamp, resources: Object.fromEntries(Object.keys(content.resources).map((id) => [id, id === "alloy" ? 500 : id === "volatile" ? 220 : 140])), buildings: [{ id: "command-relay-1", buildingId: "command_relay", position: { x: 440, y: 360 }, level: 1, health: content.buildings.command_relay.maxHealth }, { id: "matter-extractor-1", buildingId: "matter_extractor", position: { x: 280, y: 240 }, level: 1, health: content.buildings.matter_extractor.maxHealth }], reserves: {}, research: [], doctrineId: "none", commanderId: "mara_voss", reports: [], settings: { muted: false, reducedMotion: false } };
 }
 
 export function selectColonyCommander(state: ColonyState, commanderId: string, content: OrbitscarContent): ColonyState {
   if (!content.commanders[commanderId]) throw new Error(`unknown commander '${commanderId}'`);
   const next = clone(state);
   next.commanderId = commanderId;
+  next.updatedAt = now();
+  return next;
+}
+
+export function researchDoctrine(state: ColonyState, doctrineId: string, content: OrbitscarContent): ColonyState {
+  const doctrine = content.doctrines[doctrineId];
+  if (!doctrine || doctrine.theme === "none") throw new Error(`unknown doctrine '${doctrineId}'`);
+  if (state.doctrineId !== "none") throw new Error("doctrine already committed; this choice is permanent");
+  if (!canAfford(state.resources, doctrine.cost)) throw new Error("insufficient resources for doctrine research");
+  const next = clone(state);
+  spend(next.resources, doctrine.cost);
+  next.research.push(doctrineId);
+  next.doctrineId = doctrineId;
   next.updatedAt = now();
   return next;
 }
@@ -96,7 +109,7 @@ export function collectColonyProduction(state: ColonyState, atMs: number, _conte
 }
 
 export function trainUnits(state: ColonyState, unitId: string, count: number, content: OrbitscarContent): ColonyState {
-  const definition = content.units[unitId]; if (!definition) throw new Error(`unknown unit '${unitId}'`); if (!Number.isInteger(count) || count < 1) throw new Error("count must be a positive integer"); const cost: OrbitscarResourceBundle = {}; for (const [id, amount] of Object.entries(definition.cost)) cost[id] = amount * count; if (!canAfford(state.resources, cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, cost); next.reserves[unitId] = (next.reserves[unitId] ?? 0) + count; next.updatedAt = now(); return next;
+  const definition = content.units[unitId]; if (!definition) throw new Error(`unknown unit '${unitId}'`); if (!Number.isInteger(count) || count < 1) throw new Error("count must be a positive integer"); const multiplier = content.doctrines[state.doctrineId]?.trainingCostMultiplier ?? 1; const cost: OrbitscarResourceBundle = {}; for (const [id, amount] of Object.entries(definition.cost)) cost[id] = Math.ceil(amount * count * multiplier); if (!canAfford(state.resources, cost)) throw new Error("insufficient resources"); const next = clone(state); spend(next.resources, cost); next.reserves[unitId] = (next.reserves[unitId] ?? 0) + count; next.updatedAt = now(); return next;
 }
 
 export function applyBattleResult(state: ColonyState, input: OrbitscarBattleInput, result: OrbitscarBattleResult, attemptId: string): ColonyState {
@@ -134,7 +147,8 @@ export function applyColonyDefenseResult(state: ColonyState, input: OrbitscarBat
   if (state.reports.some((report) => report.attemptId === attemptId)) return clone(state);
   state = settleColonyProduction(state, atMs, input.content);
   const next = clone(state);
-  next.buildings = next.buildings.map((building) => ({ ...building, health: Math.max(0, building.health - (result.damageByEntity[building.id] ?? 0)) }));
+  const defenseHealthMultiplier = input.content.doctrines[input.defenderDoctrineId ?? "none"]?.defenseHealthMultiplier ?? 1;
+  next.buildings = next.buildings.map((building) => ({ ...building, health: Math.max(0, building.health - (result.damageByEntity[building.id] ?? 0) / defenseHealthMultiplier) }));
   next.reports.unshift({ id: attemptId, attemptId, createdAt: now(), kind: "defense", input: clone(input), result: clone(result) });
   next.reports = next.reports.slice(0, MAX_COLONY_REPORTS);
   next.updatedAt = now();
@@ -166,11 +180,12 @@ export function parseColonySave(serialized: string): ColonyState {
   try { parsed = JSON.parse(serialized); } catch { throw new Error("colony save is not valid JSON"); }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("colony save must be an object");
   const save = parsed as Partial<ColonySave>;
-  if (save.payload === undefined || typeof save.checksum !== "string" || ![1, 2, 3, 4, COLONY_SCHEMA_VERSION].includes(save.schemaVersion ?? -1)) throw new Error("unsupported colony save schema");
+  if (save.payload === undefined || typeof save.checksum !== "string" || ![1, 2, 3, 4, 5, COLONY_SCHEMA_VERSION].includes(save.schemaVersion ?? -1)) throw new Error("unsupported colony save schema");
   if (authoritativeDigest(save.payload) !== save.checksum) throw new Error("colony save checksum mismatch");
   const payload = clone(save.payload);
   payload.schemaVersion = COLONY_SCHEMA_VERSION;
   payload.commanderId = payload.commanderId ?? "mara_voss";
+  payload.doctrineId = payload.doctrineId ?? "none";
   payload.settings = payload.settings ?? { muted: false, reducedMotion: false };
   payload.productionUpdatedAt = payload.productionUpdatedAt ?? payload.updatedAt ?? payload.createdAt;
   payload.reports = (payload.reports ?? []).map((report, index) => ({ ...report, kind: report.kind ?? "attack", attemptId: report.attemptId ?? report.id ?? `legacy-attempt-${index + 1}` }));

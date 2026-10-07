@@ -40,6 +40,13 @@
     "mara_voss": { "abilityId": "emergency_reroute", "charges": 1 },
     "ion_kade": { "abilityId": "weapon_overcharge", "charges": 1 }
   },
+  "doctrines": {
+    "none": { "theme": "none", "description": "No permanent combat specialization.", "cost": {}, "effects": { "unitDamageMultiplier": 1, "bonusDamageVsDefenses": 1, "trainingCostMultiplier": 1, "defenseDamageMultiplier": 1, "defenseHealthMultiplier": 1 } },
+    "power": { "theme": "power", "description": "Increase every deployed unit's damage by 12%.", "cost": { "alloy": 160, "volatile": 70, "signal": 45 }, "effects": { "unitDamageMultiplier": 1.12, "bonusDamageVsDefenses": 1, "trainingCostMultiplier": 1, "defenseDamageMultiplier": 1, "defenseHealthMultiplier": 1 } },
+    "logistics": { "theme": "logistics", "description": "Reduce unit training costs by 20%.", "cost": { "alloy": 160, "volatile": 70, "signal": 45 }, "effects": { "unitDamageMultiplier": 1, "bonusDamageVsDefenses": 1, "trainingCostMultiplier": 0.8, "defenseDamageMultiplier": 1, "defenseHealthMultiplier": 1 } },
+    "breach": { "theme": "breach", "description": "Deal 25% more damage to hostile defenses.", "cost": { "alloy": 160, "volatile": 70, "signal": 45 }, "effects": { "unitDamageMultiplier": 1, "bonusDamageVsDefenses": 1.25, "trainingCostMultiplier": 1, "defenseDamageMultiplier": 1, "defenseHealthMultiplier": 1 } },
+    "defense": { "theme": "defense", "description": "Colony defenses deal 20% more damage and structures gain 15% integrity during raids.", "cost": { "alloy": 160, "volatile": 70, "signal": 45 }, "effects": { "unitDamageMultiplier": 1, "bonusDamageVsDefenses": 1, "trainingCostMultiplier": 1, "defenseDamageMultiplier": 1.2, "defenseHealthMultiplier": 1.15 } }
+  },
   "encounters": {
     "cinder-yard": {
       "name": "Cinder Yard Relay",

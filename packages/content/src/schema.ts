@@ -72,6 +72,18 @@ export type OrbitscarCommanderDefinition = {
   charges: number;
 };
 
+export type OrbitscarDoctrineDefinition = {
+  id: string;
+  theme: "power" | "logistics" | "breach" | "defense" | "none";
+  description: string;
+  cost: OrbitscarResourceBundle;
+  unitDamageMultiplier: number;
+  bonusDamageVsDefenses: number;
+  trainingCostMultiplier: number;
+  defenseDamageMultiplier: number;
+  defenseHealthMultiplier: number;
+};
+
 export type OrbitscarEncounterDefinition = {
   id: string;
   name: string;
@@ -93,6 +105,7 @@ export type OrbitscarContent = {
   units: Record<string, OrbitscarUnitDefinition>;
   abilities: Record<string, OrbitscarAbilityDefinition>;
   commanders: Record<string, OrbitscarCommanderDefinition>;
+  doctrines: Record<string, OrbitscarDoctrineDefinition>;
   encounters: Record<string, OrbitscarEncounterDefinition>;
 };
 
@@ -242,6 +255,18 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
     "commanders",
   );
 
+  const rawDoctrines = record(input.doctrines, "doctrines");
+  const doctrines = uniqueIds(Object.entries(rawDoctrines).map(([id, raw]) => {
+    const item = record(raw, `doctrines.${id}`);
+    const theme = stringValue(item.theme, `doctrines.${id}.theme`);
+    if (!["none", "power", "logistics", "breach", "defense"].includes(theme)) throw new Error(`doctrines.${id}.theme is unknown`);
+    const effects = record(item.effects, `doctrines.${id}.effects`);
+    const multipliers = ["unitDamageMultiplier", "bonusDamageVsDefenses", "trainingCostMultiplier", "defenseDamageMultiplier", "defenseHealthMultiplier"] as const;
+    const parsedEffects = Object.fromEntries(multipliers.map((key) => [key, finiteNumber(effects[key], `doctrines.${id}.effects.${key}`, 0.01)])) as Pick<OrbitscarDoctrineDefinition, typeof multipliers[number]>;
+    if (Object.values(parsedEffects).some((value) => value > 2)) throw new Error(`doctrines.${id}.effects multipliers must be <= 2`);
+    return { id, theme: theme as OrbitscarDoctrineDefinition["theme"], description: stringValue(item.description, `doctrines.${id}.description`), cost: resourceBundle(item.cost, `doctrines.${id}.cost`), ...parsedEffects };
+  }), "doctrines");
+
   for (const building of Object.values(buildings)) {
     if (building.defenseId !== undefined && defenses[building.defenseId] === undefined) throw new Error(`building '${building.id}' references unknown defense '${building.defenseId}'`);
   }
@@ -282,5 +307,6 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
     "encounters",
   );
 
-  return { schemaVersion, contentSet, rulesetVersion, resources, buildings, defenses, units, abilities, commanders, encounters };
+  if (!doctrines.none || doctrines.none.theme !== "none") throw new Error("doctrines.none is required as the neutral doctrine");
+  return { schemaVersion, contentSet, rulesetVersion, resources, buildings, defenses, units, abilities, commanders, doctrines, encounters };
 }
