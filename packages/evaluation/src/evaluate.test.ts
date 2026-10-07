@@ -33,7 +33,7 @@ describe("Orbitscar evaluation harness", () => {
     for (const encounter of encounters) expect(records.some((record) => record.encounter === encounter.id), `${encounter.id} covered`).toBe(true);
     // every battle must terminate within the authored duration window
     for (const record of records) expect(record.durationTicks).toBeLessThanOrEqual(2400);
-  }, 15_000);
+  }, 30_000);
 
   it("finds at least two materially different victorious plans against the introductory target", () => {
     const records = [];

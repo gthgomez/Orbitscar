@@ -35,6 +35,47 @@ results, not human fun or strategy-parity evidence.
 After moving obstacle topology signatures to a destruction-driven version
 counter, the exact 1,344-run JSONL output remained byte-for-byte identical.
 
+## PvE expansion iteration — 2026-10-07
+
+Eight authored targets expanded the sequence to 11 encounters across cautious,
+contested and severe bands. New-layout tests validate arena bounds and
+non-overlapping footprints. An independent content review caught and fixed an
+overlap in Shard Cairn before acceptance. Glasswake Gate exposes a tier-2
+opponent behind a tier-1 access gate as an optional early challenge; its
+opponent tier is validated separately from player access.
+
+The 4,928-run ruleset 0.3.0 evaluation covered 2,464 plans × 2 seed replicas
+with zero invariant violations and 4,400 unique outcome hashes. Aggregate
+attacker win rates: screen-line 81.3%, air-harass 81.1%, ranged-fortress
+74.0%, anti-armor-punch 71.7%, skirmish-mix 64.1%, sabotage-strike 59.5%,
+and salvage-raid 37.6%. Timing rates: immediate mass 78.9%, probe-reinforce
+71.9%, half-half 61.6%, and three waves 55.8%. Zone rates: west 55.0%, north
+66.1%, east 72.6%, south 74.4%. Drift Lode is an undefended cache and won
+100% as intended. Hollow Meridian initially won only 12.7%; removing one
+redundant projector lane raised it to 36.2% in a follow-up 2,464-plan,
+single-seed run with zero invariant violations. It remains a deliberately
+severe end-tier encounter. These aggregate rates expose remaining composition
+and approach imbalance and are not evidence of human fun or strategy parity.
+
+Expanding the corpus made a single balance test file exceed Vitest's worker
+update window. The acceptance tests were split into a separate file without
+changing thresholds; the complete 60-test suite and production build pass.
+The old three encounters still have legacy footprint overlaps and should be
+cleaned up separately without changing their balance semantics.
+
+## Battle report attribution iteration — 2026-10-07
+
+The report readout now derives facts from recorded events. Defense contribution
+uses applied `unit_damaged` and `unit_destroyed` values keyed to the firing
+structure, so splash and reroute mitigation are represented. Attacker output
+uses `unit_attacked` events, and the defense report matches the attacker to the
+specific structure that received the reported damage. Deployment contribution
+is grouped by deployment command; the opening wave and later reinforcements are
+labeled distinctly. Commander activation is reported as an observed event, not
+as a counterfactual claim. Counter guidance is labeled as intel suggestion.
+Direct report tests cover offensive and defensive attribution. Human readability
+and usefulness remain unvalidated by blind playtest.
+
 First T-001 baseline: **1,344 deterministic runs** (672 plans × 2 seed replicas)
 across all three authored encounters, seven force archetypes, four reinforcement
 timings, four approach zones, with and without the commander ability. Zero
