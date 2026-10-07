@@ -73,4 +73,8 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 @media (max-width: 760px) { .topbar { flex-wrap: wrap; } .metrics { order: 3; width: 100%; margin-left: 0; } .content { max-height: calc(100vh - 110px); } .nav { margin-left: 0; } .content.wide { width: calc(100% - 28px); } .zone-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .readability-toggle { margin-left: 10px; }
+.authority-panel { margin: 12px auto 0; width: min(calc(100% - 24px), 820px); }
+.authority-panel label { display: block; margin: 10px 0 5px; font-weight: 700; }
+.authority-panel input { width: min(100%, 420px); padding: 10px 12px; color: #edf4f5; background: #0b1820; border: 1px solid #42616c; border-radius: 8px; }
+.authority-panel code { color: #b7d9df; }
 .low-effects .meter i { transition: none; }

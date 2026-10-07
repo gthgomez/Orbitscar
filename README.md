@@ -17,7 +17,7 @@ The working title is provisional and has not received trademark, domain, or stor
 - `apps/server/` — loopback-only local authority for persistent profiles, versioned defender snapshots, validated rival attacks, and idempotent report settlement.
 - `docs/` — recovered research plus independent product, architecture, UX, art, economy, security, testing, and roadmap records.
 
-The local product loop includes colony development, scouting, live command combat, reports, defensive raids, and a persistent profile API. The rival API is a closed-alpha development service; it has no accounts, remote network exposure, or production hosting.
+The local product loop includes colony development, scouting, live command combat, reports, defensive raids, and a persistent profile API. The web client can connect to that loopback authority for server-owned colony actions, PvE settlement, and attacks against versioned rival snapshots. The rival API is a closed-alpha development service; it has no accounts, remote network exposure, or production hosting.
 
 ## Local commands
 
@@ -37,6 +37,22 @@ pnpm check
 The browser client is intentionally Phaser-only for tactical rendering; React is not a dependency.
 
 ## Local rival authority
+
+For the authority-backed browser flow, run the server and web client in two
+terminals:
+
+```text
+pnpm --filter @orbitscar/server dev
+pnpm --filter @orbitscar/web dev
+```
+
+Open the Vite URL and choose **Local profiles**. Create or load a profile ID;
+the selected server profile owns all colony mutations and battle settlement,
+while the solo save remains separate. Rival outposts are initialized on first
+inspection under their fixed local IDs (`local-rival-drift`,
+`local-rival-ember`, and `local-rival-meridian`). The web dev/preview proxy
+routes `/api` to the loopback server. A production static host needs an
+equivalent reverse proxy to the local authority.
 
 The server binds to `127.0.0.1:4179` and stores versioned data at
 `.orbitscar/server-state.json` by default. Set `ORBITSCAR_PORT` or

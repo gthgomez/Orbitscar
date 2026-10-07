@@ -35,4 +35,4 @@ The three destinations map to the current player questions: “How is my colony?
 3. Cost, risk, and expected consequence.
 4. Long-term progress.
 
-The colony/sector remains visually dominant. Critical text is paired with a plain-language label; icons are not the sole language. Colony, Targets, and Army are implemented primary destinations. Contextual research, objectives, battle reports/replays, and the relay sector are implemented. Cosmetics, alliance/crew features, and browser-connected server-backed rival play are deferred.
+The colony/sector remains visually dominant. Critical text is paired with a plain-language label; icons are not the sole language. Colony, Targets, and Army are implemented primary destinations. Contextual research, objectives, battle reports/replays, the relay sector, and a local authority profile switch are implemented. In authority mode, the selected profile owns colony actions and PvE settlement; rival nodes expose versioned defender snapshots and submit the completed deterministic command stream for authoritative settlement. Cosmetics and alliance/crew features remain deferred.
