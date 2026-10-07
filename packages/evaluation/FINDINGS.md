@@ -330,3 +330,40 @@ or commander value) each need a hypothesis, a bounded change, and a rerun of
 this exact corpus before landing — and the human blind test should weigh in
 on whether the dominant strategy *feels* degenerate in play, not just in
 aggregates.
+
+## Reactive reserve policy selection — ruleset 0.10.0
+
+Two deterministic alternatives to the current opposite-side response were
+tested with paired two-seed corpora against immediate deployment and the
+existing reactive policy. Sending the reserve to the farthest approach from
+the first firing emitter won 68.6%, with 3.43 average casualties and 14.4%
+full breaches; the opposite-side policy won 75.8%, with 2.99 casualties and
+14.7% full breaches. This emitter-distance policy was rejected.
+
+A second candidate reinforced the probe's lane if the probe had damaged any
+defense, and otherwise switched sides. On the seed-40,000 corpus (7,392 runs),
+it won 74.0%, compared with 74.5% for immediate mass and 75.8% for the
+opposite-side response. It produced 14.3% full breaches (14.7% opposite-side),
+3.01 casualties (2.67 immediate, 2.99 opposite-side), and 16.21 average alloy
+salvage (15.20 immediate, 16.09 opposite-side). On a separate seed-100,000
+holdout corpus, it won 73.2%, compared with 74.5% immediate and 75.5%
+opposite-side; full breaches were 13.4%, 12.0%, and 14.0%, respectively. Both
+corpora had zero invariant violations. This conditional rule gains some
+full-breach outcomes at a modest cost in win rate and casualties, but it does
+not improve the broader decision enough to retain as a named evaluation
+strategy or an always-on balance gate. Human play may still value the
+additional lane choice; the aggregate result does not establish that.
+
+## Escalating colony raids — colony schema 10
+
+Defended engagements now have a cumulative save counter independent of the
+50-report history cap. Every archetype advances through three force bands of
+6, 8, and 10 deployment capacity, with different unit mixes for scavenger,
+breach, and signal raids. The band advances after each three defensive
+engagements. A fresh schema-9 save reconstructs the counter from retained
+defense reports; this is sufficient to recover the active band because the
+force reaches its cap after six engagements. Tests resolve and settle three
+real raids before checking escalation, migration, exact command/army
+agreement, and all nine archetype-band capacities. The home-colony panel shows
+the current intensity and engagements to the next increase. `pnpm check`
+passed with 103 tests across 14 files after this change.

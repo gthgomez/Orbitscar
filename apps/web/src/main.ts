@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbitscar/content";
-import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, beginColonySortie, buildColonyRaidInput, collectColonyProduction, commandTierOf, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, sectorRewardPreview, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, beginColonySortie, buildColonyRaidInput, COLONY_RAID_ARCHETYPES, colonyRaidIntensity, collectColonyProduction, commandTierOf, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, sectorRewardPreview, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
@@ -291,16 +291,16 @@ function activateCommander(): void {
 }
 
 function startColonyRaid(): void {
-  const archetypes = ["scavenger_swarm", "breach_column", "signal_harvest"] as const;
-  const raidCount = colony.reports.filter((report) => report.kind === "defense").length;
-  const archetype = archetypes[raidCount % archetypes.length];
+  const raidCount = colony.defensiveEngagements;
+  const archetype = COLONY_RAID_ARCHETYPES[raidCount % COLONY_RAID_ARCHETYPES.length];
   const seed = raidCount + 401;
+  const raidIntensity = colonyRaidIntensity(colony);
   try {
     const input = buildColonyRaidInput(colony, archetype, seed, content);
     const result = resolveOrbitscarBattle(input);
     colony = applyColonyDefenseResult(colony, input, result, `raid-${seed}`);
     persistColony(colony, "Raid result recorded.");
-    selectedTarget = { id: "home-colony", requiredTier: 1, opponentTier: 1, name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures };
+    selectedTarget = { id: "home-colony", requiredTier: 1, opponentTier: raidIntensity, name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidIntensity === 1 ? "cautious" : raidIntensity === 2 ? "contested" : "severe", description: `Hostile ${displayName(archetype)} pressure · intensity ${raidIntensity}/3 · ${input.army.reduce((sum, unit) => sum + content.units[unit.unitId].capacity * unit.count, 0)}/${input.deploymentCapacity} threat capacity.`, rewardPreview: {}, structures: input.structures };
     session = startBattle(session, { kind: "defense", input, result, attemptId: `raid-${seed}`, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0 });
     persistActiveBattle();
     lastUiReplayTick = -1;

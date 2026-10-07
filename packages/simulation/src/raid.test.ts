@@ -2,13 +2,59 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyColonyDefenseResult, createColony, placeColonyBuilding, repairColonyBuilding, researchDoctrine, selectColonyCommander, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { applyColonyDefenseResult, createColony, parseColonySave, placeColonyBuilding, repairColonyBuilding, researchDoctrine, selectColonyCommander, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { authoritativeDigest } from "./hash.js";
 import { buildColonyRaidInput } from "./raid.js";
 import { resolveOrbitscarBattle } from "./orbitscar.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
 
 describe("colony raid loop", () => {
+  it("escalates repeated raid forces within deployment capacity and migrates the count", () => {
+    let colony = createColony("escalating-defender", content);
+    const forceCapacity = (army: Array<{ unitId: string; count: number }>) => army.reduce((sum, entry) => sum + content.units[entry.unitId].capacity * entry.count, 0);
+    const opening = buildColonyRaidInput(colony, "scavenger_swarm", 501, content);
+    for (let raid = 0; raid < 3; raid += 1) {
+      const input = buildColonyRaidInput(colony, "scavenger_swarm", 501 + raid, content);
+      const result = resolveOrbitscarBattle(input);
+      colony = applyColonyDefenseResult(colony, input, result, `escalating-raid-${raid}`);
+    }
+    const escalated = buildColonyRaidInput(colony, "scavenger_swarm", 504, content);
+    expect(colony.defensiveEngagements).toBe(3);
+    expect(forceCapacity(escalated.army)).toBeGreaterThan(forceCapacity(opening.army));
+    expect(forceCapacity(escalated.army)).toBeLessThanOrEqual(escalated.deploymentCapacity);
+    expect(escalated.commands[0].type).toBe("DEPLOY");
+    if (escalated.commands[0].type === "DEPLOY") expect(forceCapacity(escalated.commands[0].payload.units)).toBe(forceCapacity(escalated.army));
+
+    const { defensiveEngagements: _removed, ...v9Payload } = colony;
+    v9Payload.schemaVersion = 9;
+    const v9Save = JSON.stringify({ schemaVersion: 9, payload: v9Payload, checksum: authoritativeDigest(v9Payload) });
+    const migrated = parseColonySave(v9Save);
+    expect(migrated.defensiveEngagements).toBe(3);
+  });
+
+  it("keeps all three raid archetypes within each three-step force band", () => {
+    const colony = createColony("raid-capacity", content);
+    const expectedCapacities = [6, 8, 10];
+    for (const [archetypeIndex, archetype] of (["scavenger_swarm", "breach_column", "signal_harvest"] as const).entries()) {
+      for (let band = 0; band < expectedCapacities.length; band += 1) {
+        const profile = { ...colony, defensiveEngagements: band * 3 };
+        const input = buildColonyRaidInput(profile, archetype, 600 + archetypeIndex * 10 + band, content);
+        const capacity = input.army.reduce((sum, entry) => sum + content.units[entry.unitId].capacity * entry.count, 0);
+        expect(capacity).toBe(expectedCapacities[band]);
+        expect(capacity).toBeLessThanOrEqual(input.deploymentCapacity);
+        expect(input.commands[0].type).toBe("DEPLOY");
+        if (input.commands[0].type === "DEPLOY") expect(input.commands[0].payload.units).toEqual(input.army);
+      }
+    }
+  });
+
+  it("rejects malformed defensive engagement state before constructing a raid", () => {
+    const colony = createColony("invalid-raid-count", content);
+    expect(() => buildColonyRaidInput({ ...colony, defensiveEngagements: -1 }, "scavenger_swarm", 700, content)).toThrow("invalid defensive engagement count");
+    expect(() => buildColonyRaidInput({ ...colony, defensiveEngagements: Number.NaN }, "scavenger_swarm", 700, content)).toThrow("invalid defensive engagement count");
+  });
+
   it("converts the live colony layout into the authoritative battle snapshot", () => {
     const colony = placeColonyBuilding(upgradeColonyBuilding(trainUnits(createColony("defender", content), "line_rigger", 3, content), "command-relay-1", content), "scatter_coil", { x: 120, y: 320 }, content);
     const input = buildColonyRaidInput(colony, "scavenger_swarm", 40, content);

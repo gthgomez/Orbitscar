@@ -67,7 +67,7 @@ describe("Orbitscar persistent colony loop", () => {
     const v3Payload = { ...oldPayload, schemaVersion: 3 };
     const legacySave = JSON.stringify({ schemaVersion: 3, payload: v3Payload, checksum: authoritativeDigest(v3Payload) });
     const migrated = parseColonySave(legacySave);
-    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.productionUpdatedAt).toBe(initial.updatedAt);
     expect(migrated.sector.securedNodeIds).toEqual([]);
     expect(migrated.sortieCount).toBe(0);
@@ -79,7 +79,7 @@ describe("Orbitscar persistent colony loop", () => {
     const v8Payload = { ...legacyPayload, schemaVersion: 8 };
     const legacySave = JSON.stringify({ schemaVersion: 8, payload: v8Payload, checksum: authoritativeDigest(v8Payload) });
     const migrated = parseColonySave(legacySave);
-    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.sortieCount).toBe(0);
     expect(parseColonySave(serializeColony(migrated)).sortieCount).toBe(0);
   });

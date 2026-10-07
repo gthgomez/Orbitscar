@@ -31,6 +31,15 @@ describe("first-session UI and scouting", () => {
     expect(html).not.toContain("relay drone");
   });
 
+  it("shows raid escalation and the remaining defended engagements before the next band", () => {
+    const fresh = render({ colony: createColony("fresh-raid", content), session: createGameSession() });
+    expect(fresh).toContain("Raid intensity 1/3");
+    expect(fresh).toContain("3 defensive engagements until the next increase");
+    const pressured = render({ colony: { ...createColony("pressured-raid", content), defensiveEngagements: 5 }, session: createGameSession() });
+    expect(pressured).toContain("Raid intensity 2/3");
+    expect(pressured).toContain("1 defensive engagement until the next increase");
+  });
+
   it("keeps exact layouts and counters hidden until signal is spent to scout", () => {
     const colony = createColony("fresh", content);
     const session = { ...createGameSession(), mode: "targets" as const };
