@@ -218,6 +218,37 @@ Further anti-air balance work should use this evidence and preserve the
 specialist's actual counter interaction. No human readability or fun claim is
 made.
 
+## Air-only Snare counter — ruleset 0.9.0
+
+The Snare Lattice now has a 70-unit, half-damage splash radius filtered to air
+units. Its direct target priority remains air-first with the existing general
+fallback, so its primary shot behavior stays intact. Secondary hits do not add
+the extra integer-rounding weakness bonus, keeping the swarm counter below its
+direct hit strength; other defenses retain the existing bonus. Deterministic
+regressions cover clustered drone splash, filtered ground splash, and the
+existing Scatter Coil splash weakness behavior.
+
+A paired 4,928-run evaluation used the same 2,464 plans and two seed replicas
+for rulesets 0.8.0 and 0.9.0. Invariants remained at zero and each run produced
+4,400 unique outcome hashes. Air-harass fell from 82.4% to 73.0% overall; its
+three no-snare encounter outcomes were identical, retaining a 90.1% win rate.
+Across snare encounters, air-harass win rates fell between 3.2 and 25 points
+by layout and its casualties rose by 0.63 per battle overall. Every other
+composition's win rate, casualties, and no-snare outcomes were identical to
+0.8.0, isolating the new counter effect. In the full 0.9.0 corpus the rates are
+screen-line 71.9%, anti-armor 75.4%, ranged-fortress 64.6%, skirmish-mix 51.8%,
+sabotage-strike 51.8%, and salvage-raid 36.9%. Timing remains biased:
+immediate-mass wins 74.8%, probe-then-reinforce 66.1%, half-half 56.3%, and
+three waves 46.0%. Approach rates span 57.4–64.4%. These paired results add a
+meaningful anti-air niche without solving fixed-delay staging or proving human
+playability.
+
+Reproduction: `pnpm evaluate -- --runs 4928 --seed-base 20000 --out
+runs/eval-2026-10-07-snare-final-v2`. The paired ruleset 0.8.0 baseline used
+the same run count and seed base before changing the content ruleset; artifacts
+are retained locally under `runs/eval-2026-10-07-snare-baseline-08` and
+`runs/eval-2026-10-07-snare-final-v2`.
+
 **Multiple viable approaches — YES.** Against the introductory target
 (cinder-yard), at least three archetypes win reliably: screen-line (100%),
 air-harass (75%), anti-armor-punch (78%). sabotage-strike is a situational

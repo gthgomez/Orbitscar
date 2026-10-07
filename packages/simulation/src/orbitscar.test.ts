@@ -9,7 +9,7 @@ const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/
 const scenario = JSON.parse(readFileSync(resolve("fixtures/battle_fixture.json"), "utf8"));
 
 function inputWith(commands: OrbitscarCommand[], overrides: Partial<OrbitscarBattleInput> = {}): OrbitscarBattleInput {
-  return { ...parseOrbitscarBattleScenario(scenario, content), commands, ...overrides };
+  return { ...parseOrbitscarBattleScenario(scenario, content), rulesetVersion: content.rulesetVersion, commands, ...overrides };
 }
 
 const baseCommands: OrbitscarCommand[] = [
@@ -62,6 +62,36 @@ describe("Orbitscar deterministic spatial combat", () => {
     const coilImpacts = result.events.filter((event) => event.tick === 0 && event.targetId === "scatter" && event.type === "unit_damaged");
     expect(coilImpacts.length).toBeGreaterThan(1);
     expect(coilImpacts.map((event) => event.entityId)).toContain("line_rigger#0");
+  });
+
+  it("lets the snare lattice splash its declared air counter weakness across a drone cluster", () => {
+    const input = inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "needle_drone", count: 4 }] } }], {
+      army: [{ unitId: "needle_drone", count: 4 }],
+      structures: [
+        { id: "snare", buildingId: "snare_lattice", position: { x: 220, y: 400 } },
+        { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } },
+      ],
+      maxDurationTicks: 1,
+    });
+    const result = resolveOrbitscarBattle(input);
+    const snareImpacts = result.events.filter((event) => event.tick === 0 && event.targetId === "snare" && event.type === "unit_damaged");
+    expect(snareImpacts.length).toBeGreaterThan(1);
+    expect(snareImpacts.some((event) => (event.value ?? 0) >= 2)).toBe(true);
+    expect(snareImpacts.some((event) => event.entityId !== snareImpacts[0]?.entityId && event.value === 1)).toBe(true);
+  });
+
+  it("restricts snare splash to air while retaining its fallback shot at ground units", () => {
+    const input = inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 2 }] } }], {
+      army: [{ unitId: "line_rigger", count: 2 }],
+      structures: [
+        { id: "snare", buildingId: "snare_lattice", position: { x: 220, y: 400 } },
+        { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } },
+      ],
+      maxDurationTicks: 1,
+    });
+    const result = resolveOrbitscarBattle(input);
+    expect(result.events.some((event) => event.type === "defense_fired" && event.entityId === "snare")).toBe(true);
+    expect(result.events.filter((event) => event.tick === 0 && event.targetId === "snare" && event.type === "unit_damaged")).toHaveLength(1);
   });
 
   it("makes a listed defensive counter deal more damage to that unit", () => {

@@ -57,6 +57,8 @@ export type OrbitscarDefenseDefinition = {
   cadence: number;
   splashRadius: number;
   splashDamageMultiplier: number;
+  splashTargetTags: OrbitscarTargetTag[];
+  splashWeaknessBonus: boolean;
   targetPriority: OrbitscarTargetPriority[];
   targetTags: OrbitscarTargetTag[];
 };
@@ -226,8 +228,11 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       const item = record(raw, `defenses.${id}`);
       const splashRadius = item.splashRadius === undefined ? 0 : finiteNumber(item.splashRadius, `defenses.${id}.splashRadius`, 0);
       const splashDamageMultiplier = item.splashDamageMultiplier === undefined ? 0 : finiteNumber(item.splashDamageMultiplier, `defenses.${id}.splashDamageMultiplier`, 0);
+      const splashTargetTags = item.splashTargetTags === undefined ? [] : tags(item.splashTargetTags, `defenses.${id}.splashTargetTags`);
+      if (item.splashWeaknessBonus !== undefined && typeof item.splashWeaknessBonus !== "boolean") throw new Error(`defenses.${id}.splashWeaknessBonus must be a boolean`);
+      const splashWeaknessBonus = item.splashWeaknessBonus !== false;
       if (splashDamageMultiplier > 2) throw new Error(`defenses.${id}.splashDamageMultiplier must be <= 2`);
-      return { id, buildingId: stringValue(item.buildingId, `defenses.${id}.buildingId`), maxHealth: finiteNumber(item.maxHealth, `defenses.${id}.maxHealth`, 1), range: finiteNumber(item.range, `defenses.${id}.range`), damage: finiteNumber(item.damage, `defenses.${id}.damage`), cadence: integerValue(item.cadence, `defenses.${id}.cadence`, 1), splashRadius, splashDamageMultiplier, targetPriority: priorities(item.targetPriority, `defenses.${id}.targetPriority`), targetTags: tags(item.targetTags, `defenses.${id}.targetTags`) };
+      return { id, buildingId: stringValue(item.buildingId, `defenses.${id}.buildingId`), maxHealth: finiteNumber(item.maxHealth, `defenses.${id}.maxHealth`, 1), range: finiteNumber(item.range, `defenses.${id}.range`), damage: finiteNumber(item.damage, `defenses.${id}.damage`, 1), cadence: integerValue(item.cadence, `defenses.${id}.cadence`, 1), splashRadius, splashDamageMultiplier, splashTargetTags, splashWeaknessBonus, targetPriority: priorities(item.targetPriority, `defenses.${id}.targetPriority`), targetTags: tags(item.targetTags, `defenses.${id}.targetTags`) };
     }),
     "defenses",
   );

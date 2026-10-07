@@ -92,10 +92,13 @@ describe("Orbitscar balance scenario acceptance gates", () => {
     }
 
     const globalRates = Object.fromEntries(zones.map((zone) => [zone, ratesByZone.get(zone)!.reduce((sum, win) => sum + win, 0) / ratesByZone.get(zone)!.length])) as Record<(typeof zones)[number], number>;
-    const gap = Math.max(...Object.values(globalRates)) - Math.min(...Object.values(globalRates));
+    const winsByZone = zones.map((zone) => ratesByZone.get(zone)!.reduce((sum, win) => sum + win, 0));
+    const sampleSize = ratesByZone.get(zones[0])!.length;
+    const gapWins = Math.max(...winsByZone) - Math.min(...winsByZone);
     expect(Object.values(targetBestCounts).every((count) => count > 0), `every approach should be a best or tied-best choice on at least one defended relay; observed ${JSON.stringify(targetBestCounts)}`).toBe(true);
     expect(Math.max(...Object.values(targetBestCounts)), `no approach should be best on most defended relays; observed ${JSON.stringify(targetBestCounts)}`).toBeLessThanOrEqual(6);
-    expect(gap, `global approach win-rate gap should remain within 15 points; observed ${JSON.stringify(globalRates)}`).toBeLessThanOrEqual(0.15);
+    // Compare integer wins so an exact 15% boundary does not fail from float rounding.
+    expect(gapWins * 100, `global approach win-rate gap should remain within 15 points; observed ${JSON.stringify(globalRates)}`).toBeLessThanOrEqual(sampleSize * 15);
   }, 30_000);
 
   it("commander ability materially changes battle outcomes", () => {

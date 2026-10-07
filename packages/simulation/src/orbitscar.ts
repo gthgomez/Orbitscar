@@ -22,7 +22,7 @@ export type OrbitscarValidation = { ok: boolean; errors: string[] };
 const MAX_BATTLE_UNITS = 100;
 
 type BattleUnit = { id: string; unitId: string; tags: OrbitscarTargetTag[]; counters: string[]; targetPriority: OrbitscarTargetPriority[]; maxHealth: number; health: number; power: number; bonusDamageVsDefenses: number; range: number; speed: number; cadence: number; position: OrbitscarPosition; nextAttackTick: number; status: "reserve" | "active" | "destroyed" | "retreated"; forcedTargetId?: string; route?: { targetId: string; topologyVersion: number; waypoints: OrbitscarPosition[]; index: number }; boostedUntil: number; overchargedUntil: number };
-type BattleStructure = { id: string; buildingId: string; defenseId?: string; tags: OrbitscarTargetTag[]; health: number; maxHealth: number; position: OrbitscarPosition; weapon?: { range: number; damage: number; cadence: number; splashRadius: number; splashDamageMultiplier: number; targetPriority: OrbitscarTargetPriority[]; nextAttackTick: number; lockedTargetId?: string } };
+type BattleStructure = { id: string; buildingId: string; defenseId?: string; tags: OrbitscarTargetTag[]; health: number; maxHealth: number; position: OrbitscarPosition; weapon?: { range: number; damage: number; cadence: number; splashRadius: number; splashDamageMultiplier: number; splashTargetTags: OrbitscarTargetTag[]; splashWeaknessBonus: boolean; targetPriority: OrbitscarTargetPriority[]; nextAttackTick: number; lockedTargetId?: string } };
 
 const COUNTER_DAMAGE_MULTIPLIER = 1.4;
 
@@ -236,14 +236,14 @@ export function resolveOrbitscarBattle(input: OrbitscarBattleInput): OrbitscarBa
       weapon.nextAttackTick = tick + weapon.cadence;
       const roll = nextRandom(randomSeed); randomSeed = roll.seed;
       const baseDamage = Math.max(1, Math.floor(weapon.damage * (0.9 + roll.value * 0.2)));
-      const splashTargets = units.filter((unit) => unit !== target && unit.status === "active" && unit.health > 0 && weapon.splashRadius > 0 && distanceSquared(target.position, unit.position) <= weapon.splashRadius * weapon.splashRadius);
+      const splashTargets = units.filter((unit) => unit !== target && unit.status === "active" && unit.health > 0 && weapon.splashRadius > 0 && (weapon.splashTargetTags.length === 0 || weapon.splashTargetTags.some((tag) => unit.tags.includes(tag))) && distanceSquared(target.position, unit.position) <= weapon.splashRadius * weapon.splashRadius);
       pushEvent({ tick, type: "defense_fired", entityId: structure.id, targetId: target.id, value: baseDamage });
       for (const [victim, rawDamage, isSplash] of [[target, baseDamage, false] as const, ...splashTargets.map((unit) => [unit, Math.max(1, Math.floor(baseDamage * weapon.splashDamageMultiplier)), true] as const)]) {
         const counterMultiplier = structure.defenseId !== undefined && victim.counters.includes(structure.defenseId) ? COUNTER_DAMAGE_MULTIPLIER : 1;
         const boostMultiplier = victim.boostedUntil > tick ? 0.55 : 1;
         const ordinaryDamage = Math.max(1, Math.floor(rawDamage * boostMultiplier));
         let damage = Math.max(1, Math.floor(rawDamage * counterMultiplier * boostMultiplier));
-        if (isSplash && counterMultiplier > 1) damage = Math.max(damage, ordinaryDamage + 1);
+        if (isSplash && counterMultiplier > 1 && weapon.splashWeaknessBonus) damage = Math.max(damage, ordinaryDamage + 1);
         victim.health = Math.max(0, victim.health - damage);
         addDamage(damageByEntity, victim.id, damage);
         pushEvent({ tick, type: victim.health <= 0 ? "unit_destroyed" : "unit_damaged", entityId: victim.id, targetId: structure.id, value: damage, remainingHealth: victim.health, position: { ...victim.position } });
