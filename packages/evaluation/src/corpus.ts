@@ -1,5 +1,5 @@
 import type { OrbitscarContent, OrbitscarEncounterDefinition } from "@orbitscar/content";
-import type { OrbitscarArmyEntry, OrbitscarBattleInput, OrbitscarCommand } from "@orbitscar/simulation";
+import { resolveOrbitscarBattle, type OrbitscarArmyEntry, type OrbitscarBattleInput, type OrbitscarCommand } from "@orbitscar/simulation";
 
 export type Zone = "west" | "north" | "south" | "east";
 
@@ -38,7 +38,7 @@ export function compositionsFor(content: OrbitscarContent): Composition[] {
 }
 
 /** Reinforcement timings: immediate mass deployment vs staged or delayed reinforcement. */
-export type Timing = { id: string; description: string; waveFractions: number[]; delayedSecondWaveTick?: number };
+export type Timing = { id: string; description: string; waveFractions: number[]; delayedSecondWaveTick?: number; reactive?: boolean };
 
 export const timings: Timing[] = [
   { id: "immediate-mass", description: "Everything in one wave at tick 0", waveFractions: [1] },
@@ -46,6 +46,7 @@ export const timings: Timing[] = [
   { id: "probe-then-reinforce", description: "Small probe, main force at tick 900", waveFractions: [0.25, 0.75], delayedSecondWaveTick: 900 },
   { id: "third-third-third", description: "Three waves at 0 / 600 / 1200", waveFractions: [1 / 3, 1 / 3, 1 / 3] },
 ];
+export const reactiveTiming: Timing = { id: "reactive-counter-read", description: "Probe, then reinforce one tick after the first defense shot", waveFractions: [0.25, 0.75], reactive: true };
 
 export function splitArmy(units: OrbitscarArmyEntry[], fractions: number[]): OrbitscarArmyEntry[][] {
   const waves: OrbitscarArmyEntry[][] = fractions.map(() => []);
@@ -69,12 +70,13 @@ export type PlanInput = { descriptor: PlanDescriptor; input: OrbitscarBattleInpu
 export function buildPlanInput(content: OrbitscarContent, encounter: OrbitscarEncounterDefinition, composition: Composition, timing: Timing, zone: Zone, ability: boolean, seed: number): PlanInput {
   const waves = splitArmy(composition.units, timing.waveFractions);
   if (waves.length > MAX_DEPLOYMENT_CHARGES) throw new Error(`plan needs ${waves.length} charges`);
-  const commands: OrbitscarCommand[] = waves.map((units, index) => ({
+  const secondZone = timing.delayedSecondWaveTick !== undefined || timing.reactive ? oppositeZone(zone) : zone;
+  let commands: OrbitscarCommand[] = waves.map((units, index) => ({
     commandId: `wave-${index + 1}`,
     sequence: index + 1,
     tick: index === 0 ? 0 : (timing.delayedSecondWaveTick ?? 600) * (index === 1 ? 1 : index),
     type: "DEPLOY" as const,
-    payload: { zone: index === 0 ? zone : index === 1 && timing.delayedSecondWaveTick !== undefined ? oppositeZone(zone) : zone, position: { ...ZONE_POSITIONS[index === 0 ? zone : index === 1 && timing.delayedSecondWaveTick !== undefined ? oppositeZone(zone) : zone] }, units },
+    payload: { zone: index === 0 ? zone : index === 1 ? secondZone : zone, position: { ...ZONE_POSITIONS[index === 0 ? zone : index === 1 ? secondZone : zone] }, units },
   }));
   const abilityTarget = encounter.structures.find((structure) => content.buildings[structure.buildingId]?.defenseId !== undefined)?.id;
   if (ability) commands.push({ commandId: "commander-reroute", sequence: commands.length + 1, tick: 30, type: "COMMANDER_ABILITY" as const, payload: abilityTarget === undefined ? { abilityId: content.commanders.mara_voss.abilityId } : { abilityId: content.commanders.mara_voss.abilityId, targetStructureId: abilityTarget } });
@@ -93,6 +95,17 @@ export function buildPlanInput(content: OrbitscarContent, encounter: OrbitscarEn
     commands,
     content,
   };
+  if (timing.reactive && waves.length > 1) {
+    const openingCommand = commands.find((command) => command.type === "DEPLOY")!;
+    const preview = resolveOrbitscarBattle({ ...input, commands: commands.filter((command) => command === openingCommand || command.type === "COMMANDER_ABILITY") });
+    const firstShotTick = firstAcquisitionShot(preview.events);
+    const reinforcement = commands.find((command) => command.type === "DEPLOY" && command !== openingCommand);
+    if (reinforcement?.type === "DEPLOY") {
+      reinforcement.tick = Math.min(input.maxDurationTicks - 1, firstShotTick === undefined ? 300 : firstShotTick + 1);
+      commands = commands.map((command) => command === reinforcement ? reinforcement : command).sort((a, b) => a.tick - b.tick || a.sequence - b.sequence).map((command, sequence) => ({ ...command, sequence: sequence + 1 }));
+    }
+  }
+  input.commands = commands;
   return { descriptor: { encounterId: encounter.id, compositionId: composition.id, timingId: timing.id, zone, ability }, input };
 }
 
@@ -103,4 +116,29 @@ function oppositeZone(zone: Zone): Zone {
     case "north": return "south";
     case "south": return "north";
   }
+}
+
+function firstAcquisitionShot(events: ReturnType<typeof resolveOrbitscarBattle>["events"]): number | undefined {
+  const shotsByLock = new Map<string, Array<{ sequence: number; tick: number }>>();
+  for (const event of events) {
+    if (event.type !== "defense_fired" || !event.entityId || !event.targetId) continue;
+    const key = JSON.stringify([event.entityId, event.targetId]);
+    const shots = shotsByLock.get(key) ?? [];
+    shots.push(event);
+    shotsByLock.set(key, shots);
+  }
+  for (const event of events) {
+    if (event.type !== "defense_aimed" || !event.entityId || !event.targetId) continue;
+    const shots = shotsByLock.get(JSON.stringify([event.entityId, event.targetId]));
+    if (!shots) continue;
+    let low = 0;
+    let high = shots.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (shots[middle].sequence <= event.sequence) low = middle + 1;
+      else high = middle;
+    }
+    if (low < shots.length) return shots[low].tick;
+  }
+  return undefined;
 }

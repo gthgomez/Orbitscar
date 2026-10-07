@@ -218,6 +218,23 @@ Further anti-air balance work should use this evidence and preserve the
 specialist's actual counter interaction. No human readability or fun claim is
 made.
 
+The live reactive policy is now reproducible in the evaluation corpus as
+`reactive-counter-read`: it opens with one quarter of the force, resolves that
+opening through the authoritative simulation, then reinforces one tick after
+the first defense acquisition that leads to a shot, from the opposite approach.
+If no acquired defense fires, it schedules the reserve at tick 300. The paired
+two-seed corpus contains 6,160 runs (3,080 plans × two replicas), zero
+invariant violations, and 5,280 unique outcome hashes. Reactive timing won
+76.1% versus 74.5% for immediate mass, with 3.00 versus 2.70 average
+casualties and 16.0 versus 15.2 average alloy salvage. Across 1,232 paired
+cases, reactive deployment improved the winner in 114 and worsened it in 95;
+it improved victory tier in 94 and worsened it in 76. This creates a measurable
+tradeoff: better access to salvage and more wins at the cost of additional
+casualties, while immediate deployment retains matchup-specific advantages.
+It does not show one timing is universally better. Reproduce with
+`pnpm evaluate -- --runs 6160 --seed-base 30000 --out
+runs/eval-2026-10-07-reactive-policy-final`.
+
 ## Air-only Snare counter — ruleset 0.9.0
 
 The Snare Lattice now has a 70-unit, half-damage splash radius filtered to air
