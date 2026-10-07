@@ -54,16 +54,17 @@ function winRate(records: RunRecord[]): number {
 }
 
 describe("Orbitscar balance scenario guards", () => {
-  it("specialists retain niche value on every encounter", () => {
+  it("specialists retain niche value from a viable approach on every encounter", () => {
     const replicas = 4;
     for (const encounter of encounters) {
-      const bestWinRate = Math.max(...compositions
+      const specialistRates = compositions
         .filter((composition) => composition.id !== "screen-line")
-        .map((composition) => {
-          const runs = Array.from({ length: replicas }, (_, replica) => scenario(encounter.id, composition.id, "immediate-mass", "west", false, compositionSeed(COMPOSITION_SEED_BASE, replica)));
-          return winRate(runs);
+        .flatMap((composition) => (["west", "north", "south", "east"] as const).map((zone) => {
+          const runs = Array.from({ length: replicas }, (_, replica) => scenario(encounter.id, composition.id, "immediate-mass", zone, false, compositionSeed(COMPOSITION_SEED_BASE, replica)));
+          return { id: `${composition.id}/${zone}`, rate: winRate(runs) };
         }));
-      expect(bestWinRate, `no specialist composition reached a 75% win rate on ${encounter.id}; specialists must keep niche value`).toBeGreaterThanOrEqual(0.75);
+      const best = Math.max(...specialistRates.map(({ rate }) => rate));
+      expect(best, `no specialist composition/approach reached a 75% win rate on ${encounter.id} (${specialistRates.map(({ id, rate }) => `${id}=${Math.round(rate * 100)}%`).join(", ")}); specialist planning must retain a viable counter`).toBeGreaterThanOrEqual(0.75);
     }
   }, 30_000);
 

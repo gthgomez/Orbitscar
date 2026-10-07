@@ -97,6 +97,36 @@ also persists: west 53.2%, south 73.3%, east 72.9%. The change improves
 counter readability and composition differentiation; it does not establish
 broad strategy parity or human fun.
 
+## Splash weakness rounding and introductory target pass — ruleset 0.5.0
+
+A focused splash regression found that integer flooring could erase the 1.4×
+listed weakness when the scatter coil's secondary hit was small. Direct hits keep
+the 0.4.0 arithmetic. A matching weakness on a splash victim now adds at least
+one point over the same mitigated ordinary hit when flooring would otherwise
+make both values equal. The rule is applied per victim and remains deterministic.
+
+The introductory Cinder Yard no longer includes the snare lattice; its Arc
+Projector and Scatter Coil teach two different vulnerabilities, while later
+encounters introduce the snare. The specialist viability guard now considers
+each of the four selectable approaches and retains its 75% threshold, so it
+checks whether the player can find a viable plan instead of requiring every
+composition to use the west approach.
+
+Same-seed comparison: 4,928 runs (2,464 plans × 2 seeds), zero invariant
+violations, 4,400 unique outcome hashes. Win / average casualties / alloy:
+screen-line 72.6% / 3.48 / 4.3; ranged-fortress 72.7% / 3.44 / 10.1;
+anti-armor 70.9% / 2.30 / 1.0; air-harass 84.2% / 3.43 / 12.3;
+skirmish-mix 59.5% / 3.58 / 4.8; salvage-raid 29.1% / 5.00 / 20.5;
+sabotage-strike 59.2% / 4.81 / 8.5. Salvage-raids trade success rate for the
+best alloy yield. The top screen-line versus air-harass gap is 11.6 points,
+larger than in the 0.4.0 corpus. Timing remains biased toward immediate mass:
+76.1% versus 68.9% for probe-reinforce and 53.2% for three waves. South/east
+approaches lead west by about 19 points. There were 153 full breaches, including
+24 zero-casualty full breaches; the only universally undefeated target is the
+intentionally undefended Drift Lode. All five balance acceptance gates and all
+five scenario guards pass, including specialist viability across approaches.
+These measurements do not establish human fun or broad strategy parity.
+
 First T-001 baseline: **1,344 deterministic runs** (672 plans × 2 seed replicas)
 across all three authored encounters, seven force archetypes, four reinforcement
 timings, four approach zones, with and without the commander ability. Zero

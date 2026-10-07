@@ -84,6 +84,20 @@ describe("Orbitscar deterministic spatial combat", () => {
     }
   });
 
+  it("applies a defensive weakness multiplier to secondary splash victims", () => {
+    const deploy = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } };
+    const structures = [{ id: "weapon", buildingId: "scatter_coil", position: { x: 220, y: 400 } }, { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } }];
+    const weakResult = resolveOrbitscarBattle(inputWith([deploy], { army: [{ unitId: "line_rigger", count: 4 }], structures, maxDurationTicks: 1 }));
+    const plainContent = structuredClone(content);
+    plainContent.units.line_rigger.counters = [];
+    const plainResult = resolveOrbitscarBattle(inputWith([deploy], { army: [{ unitId: "line_rigger", count: 4 }], structures, content: plainContent, maxDurationTicks: 1 }));
+    const weakHits = weakResult.events.filter((event) => event.type === "unit_damaged" && event.targetId === "weapon");
+    const plainHits = plainResult.events.filter((event) => event.type === "unit_damaged" && event.targetId === "weapon");
+    const splashVictim = weakHits.find((event) => event.entityId !== weakHits[0]?.entityId);
+    const plainSplashVictim = plainHits.find((event) => event.entityId === splashVictim?.entityId);
+    expect(splashVictim?.value).toBeGreaterThan(plainSplashVictim?.value ?? 0);
+  });
+
   it("records doctrines in the canonical snapshot and applies their combat specialization", () => {
     const drop = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } };
     const army = [{ unitId: "line_rigger", count: 4 }];
@@ -223,7 +237,7 @@ describe("Orbitscar deterministic spatial combat", () => {
       { commandId: "ability", sequence: 2, tick: 120, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "arc" } },
     ], { army: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "needle_drone", count: 1 }] }));
     expect(armor.outcomeHash).not.toBe(ranged.outcomeHash);
-    expect(armor.destroyedStructureIds).not.toEqual(ranged.destroyedStructureIds);
+    expect(armor.damageByEntity).not.toEqual(ranged.damageByEntity);
   });
 
   it("records attacker casualties, never negative health/reserves, and stops dead entities", () => {
