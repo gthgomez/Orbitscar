@@ -40,6 +40,13 @@ describe("first-session UI and scouting", () => {
     expect(pressured).toContain("1 defensive engagement until the next increase");
   });
 
+  it("explains emergency salvage when every extractor is disabled", () => {
+    const colony = createColony("recovery-colony", content);
+    colony.buildings = colony.buildings.map((building) => building.buildingId === "matter_extractor" ? { ...building, health: 0 } : building);
+    const html = render({ colony, session: createGameSession() });
+    expect(html).toContain("Emergency salvage is active: 6 alloy, 2 volatile, and 1 signal per minute");
+  });
+
   it("keeps exact layouts and counters hidden until signal is spent to scout", () => {
     const colony = createColony("fresh", content);
     const session = { ...createGameSession(), mode: "targets" as const };

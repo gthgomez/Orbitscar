@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { applyBattleResult, advanceColony, beginColonySortie, collectColonyProduction, commandTierOf, createColony, parseColonySave, placeColonyBuilding, recordColonyScout, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { applyBattleResult, advanceColony, beginColonySortie, collectColonyProduction, commandTierOf, createColony, parseColonySave, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
 import { claimSectorNode } from "./sector.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
 import { authoritativeDigest } from "./hash.js";
@@ -59,6 +59,20 @@ describe("Orbitscar persistent colony loop", () => {
     const improved = collectColonyProduction(upgraded, start + 90_000, content);
     expect(improved.resources.alloy - upgraded.resources.alloy).toBeGreaterThan(base.resources.alloy - initial.resources.alloy);
     expect(improved.resources.volatile - upgraded.resources.volatile).toBeGreaterThan(base.resources.volatile - initial.resources.volatile);
+  });
+
+  it("restores a fully depleted colony's disabled extractor through emergency salvage", () => {
+    const colony = createColony("recovery-player", content);
+    const failed = {
+      ...colony,
+      resources: { alloy: 0, volatile: 0, signal: 0 },
+      buildings: colony.buildings.map((building) => building.buildingId === "matter_extractor" ? { ...building, health: 0 } : building),
+    };
+    const start = Date.parse(failed.productionUpdatedAt);
+    const supplied = collectColonyProduction(failed, start + 3 * 60_000, content);
+    expect(supplied.resources).toEqual({ alloy: 18, volatile: 6, signal: 3 });
+    const repaired = repairColonyBuilding(supplied, "matter-extractor-1", content, start + 3 * 60_000);
+    expect(repaired.buildings.find((building) => building.id === "matter-extractor-1")?.health).toBeGreaterThan(0);
   });
 
   it("migrates v3 saves without minting time or losing their previous timestamp", () => {

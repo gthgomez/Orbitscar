@@ -116,9 +116,12 @@ function addProduction(state: ColonyState, minutes: number): ColonyState {
   const extractorPower = next.buildings
     .filter((building) => building.buildingId === "matter_extractor" && building.health > 0)
     .reduce((sum, building) => sum + 1 + (building.level - 1) * 0.5, 0);
-  for (const [resourceId, ratePerMinute] of Object.entries({ alloy: 6, volatile: 2, signal: 2 })) {
+  const ratesPerMinute = extractorPower > 0
+    ? { alloy: 6 * extractorPower, volatile: 2 * extractorPower, signal: 2 * extractorPower }
+    : { alloy: 6, volatile: 2, signal: 1 };
+  for (const [resourceId, ratePerMinute] of Object.entries(ratesPerMinute)) {
     const cap = RESOURCE_CAPS[resourceId] ?? Number.MAX_SAFE_INTEGER;
-    next.resources[resourceId] = Math.min(cap, (next.resources[resourceId] ?? 0) + Math.floor(extractorPower * ratePerMinute * minutes));
+    next.resources[resourceId] = Math.min(cap, (next.resources[resourceId] ?? 0) + Math.floor(ratePerMinute * minutes));
   }
   next.updatedAt = now();
   return next;

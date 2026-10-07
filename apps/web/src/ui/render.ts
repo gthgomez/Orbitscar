@@ -12,7 +12,12 @@ function bundleText(bundle: OrbitscarResourceBundle): string { return Object.ent
 function button(label: string, action: string, className = "", disabled = false): string { return `<button type="button" class="${escapeHtml(className)}" data-action="${escapeHtml(action)}"${disabled ? " disabled" : ""}>${escapeHtml(label)}</button>`; }
 function capacityOf(entries: Record<string, number>, content: OrbitscarContent): number { return Object.entries(entries).reduce((total, [unitId, count]) => total + count * (content.units[unitId]?.capacity ?? 0), 0); }
 function stagedCount(session: GameSession, unitId: string): number { return session.plan.waves.reduce((total, wave) => total + (wave.units.find((entry) => entry.unitId === unitId)?.count ?? 0), 0); }
-function resourceStrip(colony: ColonyState): string { return `<div class="resource-strip">${Object.entries(colony.resources).map(([id, value]) => `<div class="resource"><strong>${Math.floor(value)}</strong><span>${displayName(id)}</span></div>`).join("")}</div>`; }
+function resourceStrip(colony: ColonyState): string {
+  const resources = `<div class="resource-strip">${Object.entries(colony.resources).map(([id, value]) => `<div class="resource"><strong>${Math.floor(value)}</strong><span>${displayName(id)}</span></div>`).join("")}</div>`;
+  return colony.buildings.some((building) => building.buildingId === "matter_extractor" && building.health > 0)
+    ? resources
+    : `${resources}<p class="notice">Emergency salvage is active: 6 alloy, 2 volatile, and 1 signal per minute until an extractor is restored.</p>`;
+}
 function buildingRole(content: OrbitscarContent, buildingId: string): string { const building = content.buildings[buildingId]; if (building.targetTags.includes("core")) return "command core"; if (building.defenseId) return `defense · ${displayName(building.defenseId)}`; if (building.targetTags.includes("resource")) return "resource target"; return building.targetTags.join(" · "); }
 
 function renderLaunchSequence(context: RenderContext): string {

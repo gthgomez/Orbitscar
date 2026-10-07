@@ -367,3 +367,16 @@ real raids before checking escalation, migration, exact command/army
 agreement, and all nine archetype-band capacities. The home-colony panel shows
 the current intensity and engagements to the next increase. `pnpm check`
 passed with 103 tests across 14 files after this change.
+
+## Extractor-loss recovery — 2026-10-07
+
+Review found a permanent economy softlock if raids disabled the only extractor
+after resources and reserves were exhausted. With no functioning extractor,
+the colony now falls back to emergency salvage at 6 alloy, 2 volatile, and 1
+signal per minute. This rate is only active while all extractors are disabled;
+ordinary production and extractor upgrades are unchanged. The alloy rate does
+not exceed normal production, preventing extractor loss from becoming a
+farming strategy. A deterministic regression begins with zero resources and
+no reserves, advances three minutes, then repairs the disabled extractor; a
+UI regression confirms the fallback rate is visible. Human pacing validation
+remains open.
