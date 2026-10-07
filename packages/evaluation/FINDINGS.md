@@ -1,4 +1,16 @@
-# Orbitscar combat evaluation findings — 2026-09-05
+# Orbitscar combat evaluation findings
+
+## Initial prototype baseline — 2026-09-05
+
+The first 1,344-run report below is historical. Its balance conclusions refer to ruleset 0.2.0 before the live command, splash, commander, and balance iterations described here.
+
+## Follow-up iteration — 2026-10-07
+
+The canonical balance test suite now runs all acceptance gates by default. The latest deterministic run passed 43 tests, including the formerly skipped line-rigger, zero-casualty, immediate-mass, and commander impact gates. The line-rigger's power was reduced from 5 to 3.75; the Glass Spine layout adds a second scatter coil; scatter coils now record data-driven splash damage; and Emergency Reroute reduces incoming damage while increasing movement speed. Ion Kade now uses a distinct weapon-overcharge ability. Evaluation commander commands run at tick 30 to represent an early live decision.
+
+The fixed-timing staging guard now focuses on contested and severe matchups. It requires at least 50% win rate for staged play in at least one such matchup and requires staging to beat immediate mass in at least one. Cinder Yard remains a cautious onboarding target where a direct opening is appropriate. This is a focused balance acceptance set; it does not establish that every tactic is competitive in every encounter.
+
+The post-change 1,344-run corpus completed with zero invariant violations and 1,200 unique outcome hashes. Average win rates remain uneven: immediate timing 74.1%, half-half 46.1%, probe-reinforce 52.7%, and three waves 40.5%. Screen-line leads force archetypes at 79.2%, while several specialists are below 50%. Thus the active gates guard against absolute sweeps but do not establish broad strategic parity. Next balance work should compare casualty and salvage efficiency by encounter and evaluate whether the high aggregate win rates purchase poor tradeoffs. Human playtesting remains unverified. The splash regression currently verifies deterministic secondary impacts at the event level; a larger clustered-versus-separated balance study remains useful.
 
 First T-001 baseline: **1,344 deterministic runs** (672 plans × 2 seed replicas)
 across all three authored encounters, seven force archetypes, four reinforcement
@@ -54,7 +66,7 @@ the modal battle ends in 600–1,200 ticks (20–40 s of replay).
 plans produce the same winner across both seed replicas (20 are genuinely
 seed-sensitive close fights).
 
-## Deliberately NOT changed tonight
+## Historical note: deliberately not changed on 2026-09-05
 
 Per the evidence-before-tuning rule, no balance values were touched. The two
 candidate changes (nerf/broaden immediate-mass dominance; improve specialist

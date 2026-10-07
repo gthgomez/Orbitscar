@@ -77,7 +77,7 @@ export function buildPlanInput(content: OrbitscarContent, encounter: OrbitscarEn
     payload: { zone: index === 0 ? zone : index === 1 && timing.delayedSecondWaveTick !== undefined ? oppositeZone(zone) : zone, position: { ...ZONE_POSITIONS[index === 0 ? zone : index === 1 && timing.delayedSecondWaveTick !== undefined ? oppositeZone(zone) : zone] }, units },
   }));
   const abilityTarget = encounter.structures.find((structure) => content.buildings[structure.buildingId]?.defenseId !== undefined)?.id;
-  if (ability) commands.push({ commandId: "commander-reroute", sequence: commands.length + 1, tick: 300, type: "COMMANDER_ABILITY" as const, payload: { abilityId: content.commanders.mara_voss.abilityId, targetStructureId: abilityTarget } });
+  if (ability) commands.push({ commandId: "commander-reroute", sequence: commands.length + 1, tick: 30, type: "COMMANDER_ABILITY" as const, payload: { abilityId: content.commanders.mara_voss.abilityId, targetStructureId: abilityTarget } });
   const input: OrbitscarBattleInput = {
     canonicalFormatVersion: 2,
     rulesetVersion: content.rulesetVersion,

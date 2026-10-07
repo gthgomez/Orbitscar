@@ -53,13 +53,15 @@ export type OrbitscarDefenseDefinition = {
   range: number;
   damage: number;
   cadence: number;
+  splashRadius: number;
+  splashDamageMultiplier: number;
   targetPriority: OrbitscarTargetPriority[];
   targetTags: OrbitscarTargetTag[];
 };
 
 export type OrbitscarAbilityDefinition = {
   id: string;
-  kind: "reroute";
+  kind: "reroute" | "overcharge";
   durationTicks: number;
   magnitude: number;
 };
@@ -77,7 +79,7 @@ export type OrbitscarEncounterDefinition = {
   difficulty: "cautious" | "contested" | "severe";
   description: string;
   rewardPreview: OrbitscarResourceBundle;
-  structures: Array<{ id: string; buildingId: string; position: { x: number; y: number }; currentHealth?: number }>;
+  structures: Array<{ id: string; buildingId: string; position: { x: number; y: number }; level?: number; currentHealth?: number }>;
   suggestedCounters: string[];
 };
 
@@ -203,7 +205,10 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
   const defenses = uniqueIds(
     Object.entries(rawDefenses).map(([id, raw]) => {
       const item = record(raw, `defenses.${id}`);
-      return { id, buildingId: stringValue(item.buildingId, `defenses.${id}.buildingId`), maxHealth: finiteNumber(item.maxHealth, `defenses.${id}.maxHealth`, 1), range: finiteNumber(item.range, `defenses.${id}.range`), damage: finiteNumber(item.damage, `defenses.${id}.damage`), cadence: integerValue(item.cadence, `defenses.${id}.cadence`, 1), targetPriority: priorities(item.targetPriority, `defenses.${id}.targetPriority`), targetTags: tags(item.targetTags, `defenses.${id}.targetTags`) };
+      const splashRadius = item.splashRadius === undefined ? 0 : finiteNumber(item.splashRadius, `defenses.${id}.splashRadius`, 0);
+      const splashDamageMultiplier = item.splashDamageMultiplier === undefined ? 0 : finiteNumber(item.splashDamageMultiplier, `defenses.${id}.splashDamageMultiplier`, 0);
+      if (splashDamageMultiplier > 2) throw new Error(`defenses.${id}.splashDamageMultiplier must be <= 2`);
+      return { id, buildingId: stringValue(item.buildingId, `defenses.${id}.buildingId`), maxHealth: finiteNumber(item.maxHealth, `defenses.${id}.maxHealth`, 1), range: finiteNumber(item.range, `defenses.${id}.range`), damage: finiteNumber(item.damage, `defenses.${id}.damage`), cadence: integerValue(item.cadence, `defenses.${id}.cadence`, 1), splashRadius, splashDamageMultiplier, targetPriority: priorities(item.targetPriority, `defenses.${id}.targetPriority`), targetTags: tags(item.targetTags, `defenses.${id}.targetTags`) };
     }),
     "defenses",
   );
@@ -222,8 +227,8 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
     Object.entries(rawAbilities).map(([id, raw]) => {
       const item = record(raw, `abilities.${id}`);
       const kind = stringValue(item.kind, `abilities.${id}.kind`);
-      if (kind !== "reroute") throw new Error(`abilities.${id}.kind '${kind}' is unknown`);
-      return { id, kind: "reroute" as const, durationTicks: integerValue(item.durationTicks, `abilities.${id}.durationTicks`, 1), magnitude: finiteNumber(item.magnitude, `abilities.${id}.magnitude`, 1) };
+      if (kind !== "reroute" && kind !== "overcharge") throw new Error(`abilities.${id}.kind '${kind}' is unknown`);
+      return { id, kind: kind as OrbitscarAbilityDefinition["kind"], durationTicks: integerValue(item.durationTicks, `abilities.${id}.durationTicks`, 1), magnitude: finiteNumber(item.magnitude, `abilities.${id}.magnitude`, 0.01) };
     }),
     "abilities",
   );
@@ -258,10 +263,13 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       const structures = rawStructures.map((rawStructure, index) => {
         const structure = record(rawStructure, `encounters.${id}.structures[${index}]`);
         const position = record(structure.position, `encounters.${id}.structures[${index}].position`);
+        const level = structure.level === undefined ? undefined : integerValue(structure.level, `encounters.${id}.structures[${index}].level`, 1);
+        if (level !== undefined && level > 20) throw new Error(`encounters.${id}.structures[${index}].level must be <= 20`);
         const result = {
           id: stringValue(structure.id, `encounters.${id}.structures[${index}].id`),
           buildingId: stringValue(structure.buildingId, `encounters.${id}.structures[${index}].buildingId`),
           position: { x: finiteNumber(position.x, `encounters.${id}.structures[${index}].position.x`), y: finiteNumber(position.y, `encounters.${id}.structures[${index}].position.y`) },
+          ...(level === undefined ? {} : { level }),
           ...(structure.currentHealth === undefined ? {} : { currentHealth: finiteNumber(structure.currentHealth, `encounters.${id}.structures[${index}].currentHealth`) }),
         };
         if (buildings[result.buildingId] === undefined) throw new Error(`encounter '${id}' references unknown building '${result.buildingId}'`);

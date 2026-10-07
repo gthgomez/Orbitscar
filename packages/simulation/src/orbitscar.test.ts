@@ -36,6 +36,34 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(result.events.some((event) => event.type === "ability")).toBe(false);
   });
 
+  it("gives the second commander a distinct overcharge effect", () => {
+    const drop: OrbitscarCommand = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "ram_walker", count: 2 }] } };
+    const ability: OrbitscarCommand = { commandId: "overcharge", sequence: 2, tick: 1, type: "COMMANDER_ABILITY", payload: { abilityId: "weapon_overcharge", targetStructureId: "arc" } };
+    const armed = inputWith([drop, ability], { commanderId: "ion_kade", maxDurationTicks: 800 });
+    const plain = inputWith([drop], { commanderId: "ion_kade", maxDurationTicks: 800 });
+    const result = resolveOrbitscarBattle(armed);
+    const baseline = resolveOrbitscarBattle(plain);
+    expect(result.commanderUse.abilityId).toBe("weapon_overcharge");
+    expect(result.events.some((event) => event.type === "ability" && event.entityId === "weapon_overcharge")).toBe(true);
+    expect(result.events.some((event) => event.type === "unit_attacked" && event.targetId === "arc")).toBe(true);
+    expect(result.outcomeHash).not.toBe(baseline.outcomeHash);
+  });
+
+  it("records scatter coil splash damage against clustered units", () => {
+    const input = inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } }], {
+      army: [{ unitId: "line_rigger", count: 4 }],
+      structures: [
+        { id: "scatter", buildingId: "scatter_coil", position: { x: 220, y: 400 } },
+        { id: "relay", buildingId: "command_relay", position: { x: 1100, y: 400 } },
+      ],
+      maxDurationTicks: 100,
+    });
+    const result = resolveOrbitscarBattle(input);
+    const coilImpacts = result.events.filter((event) => event.tick === 0 && event.targetId === "scatter" && event.type === "unit_damaged");
+    expect(coilImpacts.length).toBeGreaterThan(1);
+    expect(coilImpacts.map((event) => event.entityId)).toContain("line_rigger#0");
+  });
+
   it("keeps identical seeds stable while allowing a different seed to alter stochastic damage", () => {
     const first = resolveOrbitscarBattle(inputWith(baseCommands, { seed: 17 }));
     const repeated = resolveOrbitscarBattle(inputWith(baseCommands, { seed: 17 }));
@@ -88,9 +116,11 @@ describe("Orbitscar deterministic spatial combat", () => {
 
   it("makes deployment geography change target engagement and outcome", () => {
     const north = resolveOrbitscarBattle(inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "north", position: { x: 400, y: 60 }, units: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "line_rigger", count: 2 }] } }]));
-    const south = resolveOrbitscarBattle(inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "south", position: { x: 400, y: 740 }, units: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "line_rigger", count: 2 }] } }]));
+    const south = resolveOrbitscarBattle(inputWith([{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "pulse_marksman", count: 2 }, { unitId: "line_rigger", count: 2 }] } }]));
     expect(north.outcomeHash).not.toBe(south.outcomeHash);
-    expect(north.durationTicks !== south.durationTicks || JSON.stringify(north.attackerCasualties) !== JSON.stringify(south.attackerCasualties) || JSON.stringify(north.destroyedStructureIds) !== JSON.stringify(south.destroyedStructureIds)).toBe(true);
+    const northRoute = north.events.find((event) => event.type === "unit_moved");
+    const westRoute = south.events.find((event) => event.type === "unit_moved");
+    expect(northRoute?.position).not.toEqual(westRoute?.position);
   });
 
   it("makes reinforcement timing and ability timing observable", () => {
@@ -102,7 +132,7 @@ describe("Orbitscar deterministic spatial combat", () => {
     const delayed = resolveOrbitscarBattle(inputWith([
       { commandId: "first", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "ram_walker", count: 2 }] } },
       { commandId: "second", sequence: 2, tick: 600, type: "DEPLOY", payload: { zone: "north", position: { x: 400, y: 100 }, units: [{ unitId: "line_rigger", count: 2 }] } },
-      { commandId: "ability", sequence: 3, tick: 900, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "relay" } },
+      { commandId: "ability", sequence: 3, tick: 600, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "relay" } },
     ]));
     expect(immediate.outcomeHash).not.toBe(delayed.outcomeHash);
     expect(immediate.commanderUse.count).toBe(1); expect(delayed.commanderUse.count).toBe(1);

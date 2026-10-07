@@ -17,11 +17,11 @@
   },
   "defenses": {
     "arc_projector": { "buildingId": "arc_projector", "maxHealth": 70, "range": 260, "damage": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "ground" }, { "selector": "any" }], "targetTags": ["defense", "anti_armor"] },
-    "scatter_coil": { "buildingId": "scatter_coil", "maxHealth": 52, "range": 190, "damage": 3, "cadence": 12, "targetPriority": [{ "selector": "tag", "tag": "ground" }, { "selector": "any" }], "targetTags": ["defense", "anti_swarm"] },
+    "scatter_coil": { "buildingId": "scatter_coil", "maxHealth": 52, "range": 190, "damage": 3, "cadence": 18, "splashRadius": 90, "splashDamageMultiplier": 0.75, "targetPriority": [{ "selector": "tag", "tag": "ground" }, { "selector": "any" }], "targetTags": ["defense", "anti_swarm"] },
     "snare_lattice": { "buildingId": "snare_lattice", "maxHealth": 58, "range": 220, "damage": 2, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "air" }, { "selector": "any" }], "targetTags": ["defense", "control"] }
   },
   "units": {
-    "line_rigger": { "role": "screen", "capacity": 1, "power": 5, "health": 34, "range": 34, "speed": 5, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"], "cost": { "alloy": 8, "volatile": 2, "signal": 1 } },
+    "line_rigger": { "role": "screen", "capacity": 1, "power": 3.75, "health": 30, "range": 34, "speed": 5, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"], "cost": { "alloy": 8, "volatile": 2, "signal": 1 } },
     "pulse_marksman": { "role": "ranged_utility", "capacity": 1, "power": 4, "health": 24, "range": 150, "speed": 3, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 10, "volatile": 3, "signal": 4 } },
     "breach_medic": { "role": "support", "capacity": 2, "power": 2, "health": 28, "range": 80, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "lowest_health", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["snare_lattice"], "cost": { "alloy": 12, "volatile": 4, "signal": 6 } },
     "signal_saboteur": { "role": "disable", "capacity": 2, "power": 3, "health": 22, "range": 110, "speed": 4, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "utility" }], "targetTags": ["ground"], "counters": ["snare_lattice"], "cost": { "alloy": 14, "volatile": 5, "signal": 8 } },
@@ -33,11 +33,12 @@
     "relay_drone": { "role": "reinforcement_anchor", "capacity": 2, "power": 3, "health": 26, "range": 90, "speed": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["scatter_coil"], "cost": { "alloy": 11, "volatile": 4, "signal": 7 } }
   },
   "abilities": {
-    "emergency_reroute": { "kind": "reroute", "durationTicks": 180, "magnitude": 2 }
+    "emergency_reroute": { "kind": "reroute", "durationTicks": 180, "magnitude": 2 },
+    "weapon_overcharge": { "kind": "overcharge", "durationTicks": 180, "magnitude": 0.5 }
   },
   "commanders": {
     "mara_voss": { "abilityId": "emergency_reroute", "charges": 1 },
-    "ion_kade": { "abilityId": "emergency_reroute", "charges": 1 }
+    "ion_kade": { "abilityId": "weapon_overcharge", "charges": 1 }
   },
   "encounters": {
     "cinder-yard": {
@@ -69,6 +70,7 @@
         { "id": "extractor-2", "buildingId": "matter_extractor", "position": { "x": 760, "y": 595 } },
         { "id": "arc", "buildingId": "arc_projector", "position": { "x": 620, "y": 280 } },
         { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 710, "y": 470 } },
+        { "id": "scatter-2", "buildingId": "scatter_coil", "position": { "x": 690, "y": 330 } },
         { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 825, "y": 400 } }
       ]
     },
