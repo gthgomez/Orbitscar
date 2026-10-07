@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { authoritativeDigest, calculateOrbitscarReward, canonicalSerialize, hashOrbitscarCanonicalInput, parseOrbitscarBattleScenario, resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarCommand } from "./orbitscar.js";
+import { appendOrbitscarCommand, authoritativeDigest, calculateOrbitscarReward, canonicalSerialize, hashOrbitscarCanonicalInput, parseOrbitscarBattleScenario, resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarCommand } from "./orbitscar.js";
 import { sha256Hex } from "./hash.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(resolve("packages/content/data/orbitscar-v0/balance.json"), "utf8")));
@@ -25,7 +25,15 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(canonicalSerialize(first)).not.toBe(canonicalSerialize(second));
     expect(authoritativeDigest(first)).not.toBe(authoritativeDigest(second));
     expect(hashOrbitscarCanonicalInput(first)).toBe(hashOrbitscarCanonicalInput(second));
+    const changedRules = JSON.parse(JSON.stringify(content)); changedRules.units.line_rigger.power += 1;
+    expect(hashOrbitscarCanonicalInput({ ...first, content: changedRules })).not.toBe(hashOrbitscarCanonicalInput(first));
     expect(sha256Hex("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  });
+
+  it("does not spend commander activation when no deployed units can receive it", () => {
+    const result = resolveOrbitscarBattle(inputWith([{ commandId: "ability", sequence: 1, tick: 0, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute" } }], { maxDurationTicks: 10 }));
+    expect(result.commanderUse.count).toBe(0);
+    expect(result.events.some((event) => event.type === "ability")).toBe(false);
   });
 
   it("keeps identical seeds stable while allowing a different seed to alter stochastic damage", () => {
@@ -34,6 +42,29 @@ describe("Orbitscar deterministic spatial combat", () => {
     const different = resolveOrbitscarBattle(inputWith(baseCommands, { seed: 18 }));
     expect(repeated.outcomeHash).toBe(first.outcomeHash);
     expect(different.outcomeHash).not.toBe(first.outcomeHash);
+  });
+
+  it("accepts only future sequential commands and reproduces the appended command log", () => {
+    const first = { commandId: "first", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 2 }] } };
+    const initial = inputWith([first], { army: [{ unitId: "line_rigger", count: 4 }] });
+    const reinforcement = { commandId: "second", sequence: 2, tick: 120, type: "DEPLOY" as const, payload: { zone: "north" as const, position: { x: 400, y: 100 }, units: [{ unitId: "line_rigger", count: 2 }] } };
+    const updated = appendOrbitscarCommand(initial, reinforcement, 90);
+    expect(updated.commands).toHaveLength(2);
+    expect(resolveOrbitscarBattle(updated).outcomeHash).toBe(resolveOrbitscarBattle(updated).outcomeHash);
+    expect(() => appendOrbitscarCommand(initial, { ...reinforcement, tick: 60 }, 60)).toThrow("stale");
+    expect(() => appendOrbitscarCommand(initial, { ...reinforcement, sequence: 1 }, 90)).toThrow("sequence");
+    expect(() => appendOrbitscarCommand(initial, { ...reinforcement, tick: 150 }, 90)).toThrow("ahead");
+  });
+
+  it("keeps the battle open for legal reinforcements while selected reserves remain", () => {
+    const pressuredContent = JSON.parse(JSON.stringify(content));
+    pressuredContent.defenses.arc_projector.damage = 1000;
+    const first = { commandId: "first", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 1 }] } };
+    const initial = inputWith([first], { army: [{ unitId: "line_rigger", count: 2 }], content: pressuredContent, maxDurationTicks: 200 });
+    const result = resolveOrbitscarBattle(initial);
+    expect(result.durationTicks).toBe(200);
+    const reinforcement = { commandId: "second", sequence: 2, tick: 100, type: "DEPLOY" as const, payload: { zone: "north" as const, position: { x: 400, y: 100 }, units: [{ unitId: "line_rigger", count: 1 }] } };
+    expect(resolveOrbitscarBattle(appendOrbitscarCommand(initial, reinforcement, 70)).deploymentUsage).toHaveLength(2);
   });
 
   it("consumes explicit reserve quantities and rejects reuse or fractional units", () => {

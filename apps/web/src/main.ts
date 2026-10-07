@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbitscar/content";
-import { applyBattleResult, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, placeColonyBuilding, repairColonyBuilding, resolveOrbitscarBattle, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
+import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, buildColonyRaidInput, collectColonyProduction, placeColonyBuilding, repairColonyBuilding, resolveOrbitscarBattle, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
@@ -24,8 +24,43 @@ let buildMode: string | undefined;
 let previewPosition: { x: number; y: number } | undefined;
 let lastUiReplayTick = -1;
 let localAttemptSequence = 0;
+let selectedCommanderTargetId: string | undefined;
+const activeBattleKey = "orbitscar_active_battle_v1";
+type ActiveBattleSave = { schemaVersion: 1; kind: "attack" | "defense"; attemptId: string; targetId: string; input: OrbitscarBattleInput; currentTick: number; selectedZone: Zone };
 
-function refresh(): void { renderApp({ root, content, colony, selectedTarget, selectedBuildingId, buildMode, notice, session }); }
+function refresh(): void { renderApp({ root, content, colony, selectedTarget, selectedBuildingId, buildMode, notice, session, selectedCommanderTargetId }); }
+function persistActiveBattle(): void {
+  const replay = session.replay;
+  if (!replay) return;
+  const body: ActiveBattleSave = { schemaVersion: 1, kind: replay.kind ?? "attack", attemptId: replay.attemptId, targetId: selectedTarget.id, input: replay.input, currentTick: replay.currentTick ?? 0, selectedZone: session.plan.selectedZone };
+  try { localStorage.setItem(activeBattleKey, JSON.stringify({ ...body, checksum: authoritativeDigest(body) })); } catch { notice = "Active battle could not be saved in this browser."; }
+}
+function clearActiveBattle(): void { try { localStorage.removeItem(activeBattleKey); } catch { /* local persistence may be unavailable */ } }
+function restoreActiveBattle(): void {
+  try {
+    const serialized = localStorage.getItem(activeBattleKey);
+    if (!serialized) return;
+    const parsed = JSON.parse(serialized) as Partial<ActiveBattleSave> & { checksum?: string };
+    const { checksum, ...body } = parsed;
+    if (parsed.schemaVersion !== 1 || typeof checksum !== "string" || authoritativeDigest(body) !== checksum || !parsed.input || !parsed.attemptId || !parsed.targetId || !Number.isInteger(parsed.currentTick) || parsed.currentTick! < 0) throw new Error("invalid active battle save");
+    // Never trust embedded save content as the rules source. Rebind the replay
+    // to the shipped, schema-validated content before reproducing it.
+    const input = { ...parsed.input, content };
+    if (input.rulesetVersion !== content.rulesetVersion) throw new Error("active battle ruleset is no longer available");
+    const result = resolveOrbitscarBattle(input);
+    const currentTick = Math.min(input.maxDurationTicks, parsed.currentTick!);
+    selectedTarget = content.encounters[parsed.targetId] ?? { id: parsed.targetId, name: parsed.kind === "defense" ? "Home Colony" : "Archived Target", codename: parsed.targetId.toUpperCase(), difficulty: "contested", description: "Recovered deterministic battle snapshot.", rewardPreview: input.rewardPreview, structures: input.structures, suggestedCounters: [] };
+    const army = Object.fromEntries(input.army.map((entry) => [entry.unitId, entry.count]));
+    const waves = input.commands.filter((command) => command.type === "DEPLOY").map((command) => ({ zone: command.payload.zone, units: command.payload.units }));
+    const staged = Object.fromEntries(Object.keys(army).map((unitId) => [unitId, waves.reduce((sum, wave) => sum + (wave.units.find((entry) => entry.unitId === unitId)?.count ?? 0), 0)]));
+    const waveDraft = Object.fromEntries(Object.entries(army).map(([unitId, count]) => [unitId, Math.max(0, count - (staged[unitId] ?? 0))]));
+    const plan = { selectedArmy: army, waveDraft, selectedZone: parsed.selectedZone ?? waves.at(-1)?.zone ?? "west", waves, abilityArmed: false };
+    let eventIndex = 0;
+    while (eventIndex < result.events.length && result.events[eventIndex].tick <= currentTick) eventIndex += 1;
+    const replay = { kind: parsed.kind, input, result, attemptId: parsed.attemptId!, startedAt: performance.now() - currentTick / 30 * 1000, eventIndex, done: currentTick >= result.durationTicks, currentTick };
+    session = startBattle({ ...createGameSession(), plan }, replay);
+  } catch { clearActiveBattle(); }
+}
 function setNotice(message: string): void { notice = message; refresh(); }
 function setMode(mode: GameSession["mode"]): void { session = { ...session, mode }; buildMode = undefined; selectedBuildingId = undefined; refresh(); }
 function saveColony(message: string): void { notice = persistColony(colony, message).message; refresh(); }
@@ -51,6 +86,7 @@ function adjustWave(unitId: string, delta: number): void {
 }
 
 function stageWave(): void {
+  if (session.plan.waves.length > 0) { setNotice("The first wave is locked. Choose later reinforcements during the battle."); return; }
   if (!canStageWave(session)) { setNotice(`Deployment limit reached: ${MAX_DEPLOYMENT_CHARGES} waves maximum.`); return; }
   const units = Object.entries(session.plan.waveDraft).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count }));
   if (units.length === 0) { setNotice("Select at least one remaining unit for this wave."); return; }
@@ -63,14 +99,61 @@ function stageWave(): void {
   refresh();
 }
 
-// Emergency Reroute pins the force to a defense structure of the scouted
-// encounter; hardcoding an ID would reject the plan on any layout without it.
-function commanderRerouteTarget(): string | undefined { return selectedTarget.structures.find((structure) => content.buildings[structure.buildingId]?.defenseId !== undefined)?.id; }
-
 function createBattleInput(): OrbitscarBattleInput {
-  const commands: OrbitscarBattleInput["commands"] = session.plan.waves.map((wave, index) => ({ commandId: `wave-${index + 1}`, sequence: index + 1, tick: index * 600, type: "DEPLOY" as const, payload: { zone: wave.zone, position: { ...zonePositions[wave.zone] }, units: wave.units } }));
-  if (session.plan.abilityArmed) commands.push({ commandId: "commander-reroute", sequence: commands.length + 1, tick: 300, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: commanderRerouteTarget() } });
+  const firstWave = session.plan.waves[0];
+  const commands: OrbitscarBattleInput["commands"] = firstWave ? [{ commandId: "wave-1", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: firstWave.zone, position: { ...zonePositions[firstWave.zone] }, units: firstWave.units } }] : [];
   return { canonicalFormatVersion: 2, rulesetVersion: content.rulesetVersion, seed: 101 + selectedTarget.id.length, maxDurationTicks: 2400, arena: ARENA, deploymentCapacity: 10, maxDeploymentCharges: MAX_DEPLOYMENT_CHARGES, commanderId: "mara_voss", rewardPreview: { ...selectedTarget.rewardPreview }, army: Object.entries(session.plan.selectedArmy).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count })), structures: selectedTarget.structures.map((structure) => ({ ...structure, position: { ...structure.position } })), commands, content };
+}
+
+function activeBattleTick(replay: NonNullable<GameSession["replay"]>): number {
+  return Math.min(replay.input.maxDurationTicks, Math.max(0, Math.floor((performance.now() - replay.startedAt) / 1000 * 30)));
+}
+
+function replayToTick(replay: NonNullable<GameSession["replay"]>, tick: number, input = replay.input, result = replay.result): NonNullable<GameSession["replay"]> {
+  let eventIndex = 0;
+  while (eventIndex < result.events.length && result.events[eventIndex].tick <= tick) eventIndex += 1;
+  return { ...replay, input, result, eventIndex, done: tick >= result.durationTicks, currentTick: tick };
+}
+
+function appendLiveCommand(command: OrbitscarBattleInput["commands"][number]): void {
+  const replay = session.replay;
+  if (!replay || replay.done || replay.kind === "defense" || replay.archived || colony.reports.some((report) => report.attemptId === replay.attemptId)) return;
+  const tick = activeBattleTick(replay);
+  try {
+    const input = appendOrbitscarCommand(replay.input, command, tick);
+    const result = resolveOrbitscarBattle(input);
+    session = { ...session, replay: replayToTick(replay, tick, input, result) };
+    if (!colony.reports.some((report) => report.attemptId === replay.attemptId)) persistActiveBattle();
+    lastUiReplayTick = tick;
+    refresh();
+  } catch (error) { setNotice(error instanceof Error ? error.message : "Battle command rejected."); }
+}
+
+function deployReinforcements(): void {
+  const replay = session.replay;
+  if (!replay) return;
+  if (!canStageWave(session)) { setNotice("All deployment charges have been committed."); return; }
+  const units = Object.entries(session.plan.waveDraft).filter(([, count]) => count > 0).map(([unitId, count]) => ({ unitId, count }));
+  if (units.length === 0) { setNotice("Choose reserve units before committing a reinforcement."); return; }
+  const nextTick = Math.max(activeBattleTick(replay) + 1, (replay.input.commands.at(-1)?.tick ?? -1) + 1);
+  const sequence = Math.max(0, ...replay.input.commands.map((command) => command.sequence)) + 1;
+  const command = { commandId: `reinforcement-${sequence}`, sequence, tick: nextTick, type: "DEPLOY" as const, payload: { zone: session.plan.selectedZone, position: { ...zonePositions[session.plan.selectedZone] }, units } };
+  appendLiveCommand(command);
+  if (session.replay?.input.commands.some((entry) => entry.commandId === command.commandId)) {
+    const waves = [...session.plan.waves, { zone: session.plan.selectedZone, units }];
+    const waveDraft = Object.fromEntries(Object.entries(session.plan.selectedArmy).map(([unitId, count]) => [unitId, Math.max(0, count - countStaged(waves, unitId))]));
+    session = { ...session, plan: { ...session.plan, waves, waveDraft } };
+    notice = `Reinforcement committed from ${session.plan.selectedZone.toUpperCase()} at tick ${nextTick}.`;
+    refresh();
+  }
+}
+
+function activateCommander(): void {
+  const replay = session.replay;
+  if (!replay) return;
+  const nextTick = Math.max(activeBattleTick(replay) + 1, (replay.input.commands.at(-1)?.tick ?? -1) + 1);
+  const sequence = Math.max(0, ...replay.input.commands.map((command) => command.sequence)) + 1;
+  appendLiveCommand({ commandId: `commander-${sequence}`, sequence, tick: nextTick, type: "COMMANDER_ABILITY", payload: { abilityId: content.commanders[replay.input.commanderId].abilityId, ...(selectedCommanderTargetId === undefined ? {} : { targetStructureId: selectedCommanderTargetId }) } });
 }
 
 function startColonyRaid(): void {
@@ -84,7 +167,8 @@ function startColonyRaid(): void {
     colony = applyColonyDefenseResult(colony, input, result, `raid-${seed}`);
     persistColony(colony, "Raid result recorded.");
     selectedTarget = { id: "home-colony", name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures, suggestedCounters: [] };
-    session = startBattle(session, { kind: "defense", input, result, attemptId: `raid-${seed}`, startedAt: performance.now(), eventIndex: 0, done: false });
+    session = startBattle(session, { kind: "defense", input, result, attemptId: `raid-${seed}`, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0 });
+    persistActiveBattle();
     lastUiReplayTick = -1;
     refresh();
   } catch (error) { setNotice(error instanceof Error ? error.message : "Raid simulation failed."); }
@@ -92,17 +176,28 @@ function startColonyRaid(): void {
 
 function resolveBattle(): void {
   if (session.plan.waves.length === 0) { setNotice("Deploy at least one wave before resolving."); return; }
-  try { const input = createBattleInput(); const result = resolveOrbitscarBattle(input); session = startBattle(session, { input, result, attemptId: newAttemptId(), startedAt: performance.now(), eventIndex: 0, done: false }); lastUiReplayTick = -1; refresh(); }
+  try {
+    const firstWave = session.plan.waves[0];
+    const input = createBattleInput();
+    const result = resolveOrbitscarBattle(input);
+    const waves = firstWave ? [firstWave] : [];
+    const waveDraft = Object.fromEntries(Object.entries(session.plan.selectedArmy).map(([unitId, count]) => [unitId, Math.max(0, count - countStaged(waves, unitId))]));
+    session = { ...session, plan: { ...session.plan, waves, waveDraft } };
+    session = startBattle(session, { input, result, attemptId: newAttemptId(), startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0 });
+    persistActiveBattle();
+    selectedCommanderTargetId = undefined;
+    lastUiReplayTick = -1;
+    refresh();
+  }
   catch (error) { setNotice(error instanceof Error ? error.message : "Battle input rejected."); }
 }
 
 function retreat(): void {
   const replay = session.replay;
-  if (!replay || replay.done) return;
-  const currentTick = Math.max(1, Math.min(replay.input.maxDurationTicks, lastUiReplayTick < 0 ? 1 : lastUiReplayTick));
-  const input: OrbitscarBattleInput = { ...replay.input, commands: [...replay.input.commands, { commandId: `retreat-${replay.attemptId}`, sequence: replay.input.commands.length + 1, tick: currentTick, type: "RETREAT" as const, payload: {} }] };
-  try { const result = resolveOrbitscarBattle(input); session = startBattle(session, { ...replay, input, result, startedAt: performance.now(), eventIndex: 0, done: false }); lastUiReplayTick = -1; refresh(); }
-  catch (error) { setNotice(error instanceof Error ? error.message : "Retreat rejected."); }
+  if (!replay || replay.done || replay.kind === "defense" || replay.archived || colony.reports.some((report) => report.attemptId === replay.attemptId)) return;
+  const tick = Math.max(activeBattleTick(replay) + 1, (replay.input.commands.at(-1)?.tick ?? -1) + 1);
+  const sequence = Math.max(0, ...replay.input.commands.map((command) => command.sequence)) + 1;
+  appendLiveCommand({ commandId: `retreat-${replay.attemptId}`, sequence, tick, type: "RETREAT", payload: {} });
 }
 
 function onFrame(now: number): void {
@@ -111,8 +206,9 @@ function onFrame(now: number): void {
   const elapsedTicks = Math.floor((now - replay.startedAt) / 1000 * 30);
   let eventIndex = replay.eventIndex;
   while (eventIndex < replay.result.events.length && replay.result.events[eventIndex].tick <= elapsedTicks) eventIndex += 1;
-  const done = elapsedTicks >= replay.result.durationTicks;
-  if (eventIndex !== replay.eventIndex || done !== replay.done) { session = { ...session, replay: { ...replay, eventIndex, done } }; if (elapsedTicks - lastUiReplayTick >= 15 || done) { lastUiReplayTick = Math.min(elapsedTicks, replay.result.durationTicks); refresh(); } }
+  const currentTick = Math.min(replay.input.maxDurationTicks, elapsedTicks);
+  const done = currentTick >= replay.result.durationTicks;
+  if (eventIndex !== replay.eventIndex || done !== replay.done || currentTick !== replay.currentTick) { session = { ...session, replay: { ...replay, eventIndex, done, currentTick } }; if (eventIndex !== replay.eventIndex && !colony.reports.some((report) => report.attemptId === replay.attemptId)) persistActiveBattle(); if (eventIndex !== replay.eventIndex || done) { if (currentTick - lastUiReplayTick >= 15 || done) { lastUiReplayTick = Math.min(currentTick, replay.result.durationTicks); refresh(); } } }
 }
 
 function handleAction(action: string): void {
@@ -126,7 +222,8 @@ function handleAction(action: string): void {
     const report = colony.reports.find((entry) => entry.attemptId === value);
     if (!report?.input) { setNotice("This legacy report has no saved replay snapshot."); return; }
     selectedTarget = { id: report.kind === "defense" ? "home-colony" : selectedTarget.id, name: report.kind === "defense" ? "Home Colony" : selectedTarget.name, codename: report.kind === "defense" ? "DEFENSE-LOG" : selectedTarget.codename, difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures, suggestedCounters: [] };
-    session = startBattle(session, { kind: report.kind, input: report.input, result: report.result, attemptId: report.attemptId, startedAt: performance.now(), eventIndex: 0, done: false });
+    clearActiveBattle();
+    session = startBattle(session, { kind: report.kind, input: report.input, result: report.result, attemptId: report.attemptId, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0, archived: true });
     lastUiReplayTick = -1;
     refresh();
     return;
@@ -142,16 +239,18 @@ function handleAction(action: string): void {
   if (verb === "army" && value && unitId) { adjustArmy(unitId, value === "+" ? 1 : -1); return; }
   if (action === "begin-deployment") { if (capacityOf(session.plan.selectedArmy) === 0) { setNotice("Choose at least one unit from your persistent reserves."); return; } session = beginDeployment(session); setMode("deployment"); return; }
   if (verb === "zone" && value && ["west", "north", "south", "east"].includes(value)) { updatePlan({ ...session.plan, selectedZone: value as Zone }); return; }
+  if (verb === "commander-target" && value) { selectedCommanderTargetId = value; refresh(); return; }
   if (verb === "wave" && value && unitId) { adjustWave(unitId, value === "+" ? 1 : -1); return; }
   if (action === "deploy-wave") { stageWave(); return; }
-  if (action === "ability") { updatePlan({ ...session.plan, abilityArmed: !session.plan.abilityArmed }); return; }
+  if (action === "live-reinforce") { deployReinforcements(); return; }
+  if (action === "commander-ability") { activateCommander(); return; }
   if (action === "resolve-battle") { resolveBattle(); return; }
   if (action === "report") { session = showReport(session); refresh(); return; }
   if (action === "retreat") { retreat(); return; }
   if (action === "restart-plan") { session = restartPlan(session); setMode("deployment"); return; }
   if (action === "cancel-deployment") { session = clearAttackPlan(session); setMode("targets"); return; }
   if (action === "attack-again") { session = attackAgain(session); setMode("army"); return; }
-  if (action === "return-home" && session.replay) { try { colony = session.replay.kind === "defense" ? applyColonyDefenseResult(colony, session.replay.input, session.replay.result, session.replay.attemptId) : applyBattleResult(colony, session.replay.input, session.replay.result, session.replay.attemptId); saveColony(session.replay.kind === "defense" ? "Raid report archived. Colony damage recorded." : "Battle report archived. Survivors and salvage reconciled."); session = clearAttackPlan(session); setMode("colony"); } catch (error) { setNotice(error instanceof Error ? error.message : "Settlement rejected."); } }
+  if (action === "return-home" && session.replay) { try { colony = session.replay.kind === "defense" ? applyColonyDefenseResult(colony, session.replay.input, session.replay.result, session.replay.attemptId) : applyBattleResult(colony, session.replay.input, session.replay.result, session.replay.attemptId); saveColony(session.replay.kind === "defense" ? "Raid report archived. Colony damage recorded." : "Battle report archived. Survivors and salvage reconciled."); clearActiveBattle(); session = clearAttackPlan(session); setMode("colony"); } catch (error) { setNotice(error instanceof Error ? error.message : "Settlement rejected."); } }
 }
 
 function placeBuilding(position: { x: number; y: number }): void {
@@ -162,5 +261,6 @@ function placeBuilding(position: { x: number; y: number }): void {
 
 root.addEventListener("click", (event) => { const target = event.target as HTMLElement; const actionElement = target.closest<HTMLElement>("[data-action]"); if (actionElement?.dataset.action) handleAction(actionElement.dataset.action); });
 
+restoreActiveBattle();
 new Phaser.Game({ type: Phaser.AUTO, parent: "game", backgroundColor: "#081018", scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH, width: ARENA.width, height: ARENA.height }, input: { activePointers: 3 }, scene: new OrbitscarScene({ content, getMode: () => session.mode, getColony: () => colony, getBuildMode: () => buildMode, getSelectedBuildingId: () => selectedBuildingId, getSelectedZone: () => session.plan.selectedZone, getTargetStructures: () => selectedTarget.structures, getReplay: () => session.replay, isReducedMotion: () => colony.settings.reducedMotion, setPreview: (position) => { previewPosition = position; }, selectBuilding: (id) => { selectedBuildingId = id; refresh(); }, selectZone: (zone) => { updatePlan({ ...session.plan, selectedZone: zone }); }, placeBuilding, onFrame }) });
 refresh();
