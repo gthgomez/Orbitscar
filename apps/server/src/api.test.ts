@@ -25,6 +25,18 @@ async function stop(api: RunningApi): Promise<void> {
   await new Promise<void>((resolve, reject) => api.server.close((error) => error ? reject(error) : resolve()));
 }
 
+async function evictRequestCache(): Promise<void> {
+  await stop(running);
+  const databasePath = join(directory, "server-state.json");
+  const database = JSON.parse(await readFile(databasePath, "utf8")) as { requests: Record<string, unknown> };
+  const response = deflateSync(Buffer.from(JSON.stringify({ expired: true }))).toString("base64");
+  database.requests = Object.fromEntries(Array.from({ length: 512 }, (_, index) => [`synthetic-cache-entry-${index}`, {
+    fingerprint: "b".repeat(64), statusCode: 200, response, responseEncoding: "deflate-json-v1",
+  }]));
+  await writeFile(databasePath, JSON.stringify(database));
+  running = await start();
+}
+
 async function call<T>(api: RunningApi, path: string, method = "GET", body?: unknown): Promise<{ status: number; data: T }> {
   const response = await fetch(`${api.baseUrl}${path}`, { method, headers: body === undefined ? {} : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: response.status, data: await response.json() as T };
@@ -93,7 +105,7 @@ describe("authoritative asynchronous rival API", () => {
     const request = attackRequest(snapshot.data, "attacker", "attack-1", 3, attacker.version);
     const first = await call<{ attackId: string; input: Parameters<typeof resolveOrbitscarBattle>[0]; result: { outcomeHash: string; canonicalHash: string; commanderUse: { count: number } }; attackerVersion: number; defenderVersion: number }>(running, "/attacks", "POST", request);
     expect(first.status).toBe(201);
-    expect(first.data.attackId).toBe("attack-1");
+    expect(first.data.attackId).toBe("attacker-s3");
     expect(first.data.result.outcomeHash).toMatch(/^[a-f0-9]{64}$/);
     expect(first.data.result.commanderUse.count).toBe(1);
     expect(resolveOrbitscarBattle(first.data.input).outcomeHash).toBe(first.data.result.outcomeHash);
@@ -105,15 +117,15 @@ describe("authoritative asynchronous rival API", () => {
     expect(duplicate.data.result.outcomeHash).toBe(first.data.result.outcomeHash);
 
     const profile = await call<{ version: number; colony: { reports: Array<{ attemptId: string }>; reserves: Record<string, number> } }>(running, "/profiles/attacker");
-    expect(profile.data.colony.reports.filter((report) => report.attemptId === "attack-1")).toHaveLength(1);
+    expect(profile.data.colony.reports.filter((report) => report.attemptId === first.data.attackId)).toHaveLength(1);
     const defender = await call<{ version: number; colony: { reports: Array<{ attemptId: string; kind: string }> } }>(running, "/profiles/defender");
-    expect(defender.data.colony.reports.filter((report) => report.attemptId === "attack-1" && report.kind === "defense")).toHaveLength(1);
+    expect(defender.data.colony.reports.filter((report) => report.attemptId === first.data.attackId && report.kind === "defense")).toHaveLength(1);
     const settledAttacker = await call<{ version: number; colony: unknown }>(running, "/profiles/attacker");
     const settledDefender = await call<{ version: number; colony: unknown }>(running, "/profiles/defender");
 
     await stop(running);
     running = await start();
-    const archived = await call<typeof first.data>(running, "/attacks/attack-1");
+    const archived = await call<typeof first.data>(running, `/attacks/${first.data.attackId}`);
     expect(archived.status).toBe(200);
     expect(archived.data.result.canonicalHash).toBe(first.data.result.canonicalHash);
     const restartedAttacker = await call<{ version: number; colony: unknown }>(running, "/profiles/attacker");
@@ -207,15 +219,108 @@ describe("authoritative asynchronous rival API", () => {
     const snapshot = await call<{ version: number; snapshotHash: string }>(running, "/profiles/defender/snapshot");
     const request = attackRequest(snapshot.data, "attacker", "same-concurrent-request");
     const [first, retry] = await Promise.all([
-      call<{ result: { outcomeHash: string } }>(running, "/attacks", "POST", request),
-      call<{ result: { outcomeHash: string } }>(running, "/attacks", "POST", request),
+      call<{ attackId: string; result: { outcomeHash: string } }>(running, "/attacks", "POST", request),
+      call<{ attackId: string; result: { outcomeHash: string } }>(running, "/attacks", "POST", request),
     ]);
     expect([first.status, retry.status].sort()).toEqual([200, 201]);
     expect(first.data.result.outcomeHash).toBe(retry.data.result.outcomeHash);
     const attacker = await call<{ colony: { reports: Array<{ attemptId: string }> } }>(running, "/profiles/attacker");
     const defender = await call<{ colony: { reports: Array<{ attemptId: string }> } }>(running, "/profiles/defender");
-    expect(attacker.data.colony.reports.filter((report) => report.attemptId === "same-concurrent-request")).toHaveLength(1);
-    expect(defender.data.colony.reports.filter((report) => report.attemptId === "same-concurrent-request")).toHaveLength(1);
+    expect(attacker.data.colony.reports.filter((report) => report.attemptId === first.data.attackId)).toHaveLength(1);
+    expect(defender.data.colony.reports.filter((report) => report.attemptId === first.data.attackId)).toHaveLength(1);
+  });
+
+  it("keeps attack settlement identities unique after the request cache evicts an old key", async () => {
+    await createProfile(running, "attacker");
+    await createProfile(running, "defender");
+    await trainStarterForce(running, "attacker");
+    const originalSnapshot = await call<{ version: number; snapshotHash: string }>(running, "/profiles/defender/snapshot");
+    const original = attackRequest(originalSnapshot.data, "attacker", "reused-after-eviction", 1);
+    original.commands = (original.commands as unknown[]).slice(0, 1);
+    const first = await call<{ attackId: string }>(running, "/attacks", "POST", original);
+    expect(first.status).toBe(201);
+    await createProfile(running, "defender-two");
+    const retrained = await call<{ version: number }>(running, "/profiles/attacker/actions", "POST", {
+      requestId: "retrain-after-first-sortie",
+      expectedVersion: 3,
+      action: { type: "TRAIN", unitId: "line_rigger", count: 3 },
+    });
+    expect(retrained.status).toBe(200);
+
+    await evictRequestCache();
+    const currentSnapshot = await call<{ version: number; snapshotHash: string }>(running, "/profiles/defender-two/snapshot");
+    const repeatedRequest = attackRequest(currentSnapshot.data, "attacker", "reused-after-eviction", 3, retrained.data.version);
+    repeatedRequest.defenderId = "defender-two";
+    repeatedRequest.commands = (repeatedRequest.commands as unknown[]).slice(0, 1);
+    const reused = await call<{ attackId: string; error?: string }>(running, "/attacks", "POST", repeatedRequest);
+    expect(reused.status, reused.data.error).toBe(201);
+    expect(reused.data.attackId).not.toBe(first.data.attackId);
+
+    const attacker = await call<{ colony: { reports: Array<{ attemptId: string }> } }>(running, "/profiles/attacker");
+    const originalDefender = await call<{ colony: { reports: Array<{ attemptId: string; kind: string }> } }>(running, "/profiles/defender");
+    const defender = await call<{ colony: { reports: Array<{ attemptId: string; kind: string }> } }>(running, "/profiles/defender-two");
+    expect(attacker.data.colony.reports.filter((report) => report.attemptId === first.data.attackId)).toHaveLength(1);
+    expect(attacker.data.colony.reports.filter((report) => report.attemptId === reused.data.attackId)).toHaveLength(1);
+    expect(originalDefender.data.colony.reports.filter((report) => report.attemptId === first.data.attackId && report.kind === "defense")).toHaveLength(1);
+    expect(defender.data.colony.reports.filter((report) => report.attemptId === reused.data.attackId && report.kind === "defense")).toHaveLength(1);
+  });
+
+  it("gives repeated campaign attacks distinct settlements after request-key eviction", async () => {
+    await createProfile(running, "campaign-player");
+    const trained = await trainStarterForce(running, "campaign-player");
+    const scouted = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", {
+      requestId: "campaign-scout-for-eviction",
+      expectedVersion: trained.version,
+      action: { type: "SCOUT", targetId: "cinder-yard" },
+    });
+    expect(scouted.status).toBe(200);
+    const command = (count: number) => [{ commandId: "opening", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count }] } }];
+    const first = await call<{ version: number; attemptId: string }>(running, "/profiles/campaign-player/campaign-attacks", "POST", {
+      requestId: "campaign-reused-after-eviction",
+      expectedVersion: scouted.data.version,
+      targetId: "cinder-yard",
+      army: [{ unitId: "line_rigger", count: 1 }],
+      commands: command(1),
+    });
+    expect(first.status).toBe(201);
+    const retrained = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", {
+      requestId: "campaign-retrain-after-eviction",
+      expectedVersion: first.data.version,
+      action: { type: "TRAIN", unitId: "line_rigger", count: 3 },
+    });
+    expect(retrained.status).toBe(200);
+    await evictRequestCache();
+
+    const second = await call<{ version: number; attemptId: string }>(running, "/profiles/campaign-player/campaign-attacks", "POST", {
+      requestId: "campaign-reused-after-eviction",
+      expectedVersion: retrained.data.version,
+      targetId: "cinder-yard",
+      army: [{ unitId: "line_rigger", count: 3 }],
+      commands: command(3),
+    });
+    expect(second.status).toBe(201);
+    expect(second.data.attemptId).not.toBe(first.data.attemptId);
+    const player = await call<{ colony: { reports: Array<{ attemptId: string }> } }>(running, "/profiles/campaign-player");
+    expect(player.data.colony.reports.filter((report) => report.attemptId === first.data.attemptId)).toHaveLength(1);
+    expect(player.data.colony.reports.filter((report) => report.attemptId === second.data.attemptId)).toHaveLength(1);
+  });
+
+  it("rejects untrusted origins and non-JSON browser mutations", async () => {
+    const remoteOrigin = await fetch(`${running.baseUrl}/profiles`, {
+      method: "POST",
+      headers: { origin: "https://attacker.invalid", "content-type": "application/json" },
+      body: JSON.stringify({ profileId: "remote-origin" }),
+    });
+    expect(remoteOrigin.status).toBe(403);
+
+    const wrongContentType = await fetch(`${running.baseUrl}/profiles`, {
+      method: "POST",
+      headers: { origin: "http://localhost:4173", "content-type": "text/plain" },
+      body: JSON.stringify({ profileId: "plain-text-origin" }),
+    });
+    expect(wrongContentType.status).toBe(415);
+    expect((await call(running, "/profiles/remote-origin")).status).toBe(404);
+    expect((await call(running, "/profiles/plain-text-origin")).status).toBe(404);
   });
 
   it("resolves PvE campaign attacks on the server and persists relay ownership", async () => {
@@ -226,14 +331,15 @@ describe("authoritative asynchronous rival API", () => {
     const scouted = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-scout", expectedVersion: 2, action: { type: "SCOUT", targetId: "drift-lode" } });
     expect(scouted.status).toBe(200);
     const attack = { requestId: "campaign-drift-1", expectedVersion: 3, targetId: "drift-lode", army: [{ unitId: "line_rigger", count: 10 }], commands: [{ commandId: "opening", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 10 }] } }] };
-    const first = await call<{ profileId: string; version: number; colony: { reports: Array<{ attemptId: string }> }; result: { outcomeHash: string; victoryTier: string; winner: string }; input: Parameters<typeof resolveOrbitscarBattle>[0]; sector: { securedNodeIds: string[] } }>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
+    const first = await call<{ profileId: string; version: number; attemptId: string; colony: { reports: Array<{ attemptId: string }> }; result: { outcomeHash: string; victoryTier: string; winner: string }; input: Parameters<typeof resolveOrbitscarBattle>[0]; sector: { securedNodeIds: string[] } }>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
     expect(first.status).toBe(201);
     expect(first.data.result.winner).toBe("attacker");
     expect(resolveOrbitscarBattle(first.data.input).outcomeHash).toBe(first.data.result.outcomeHash);
     expect(first.data.sector.securedNodeIds).toContain("drift-lode");
     expect(first.data.profileId).toBe("campaign-player");
     expect(first.data.version).toBe(4);
-    expect(first.data.colony.reports.some((report) => report.attemptId === "campaign-drift-1")).toBe(true);
+    expect(first.data.attemptId).toBe("campaign-player-pve-s4");
+    expect(first.data.colony.reports.some((report) => report.attemptId === first.data.attemptId)).toBe(true);
     type StoredRequest = { response: unknown; responseEncoding?: string };
     const stored = JSON.parse(await readFile(join(directory, "server-state.json"), "utf8")) as { schemaVersion: number; requests: Record<string, StoredRequest> };
     expect(stored.schemaVersion).toBe(2);

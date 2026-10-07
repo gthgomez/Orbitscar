@@ -42,8 +42,16 @@ test.describe.serial("Orbitscar vertical slice", () => {
     await expect(page.locator('[data-action="build:matter_extractor"]')).toHaveCount(0);
     await sequence.locator('[data-action="build:arc_projector"]').click();
     await tapWorld(page, { x: 620, y: 120 });
-    await expect(sequence.locator("p strong")).toHaveText("Train three starter units");
     expect((await colonyState(page)).completedObjectives).toContain("first-defense");
+    await expect(sequence.locator("p strong")).toHaveText("Train three starter units");
+    await expect(sequence).not.toContainText("Scout a relay");
+    for (let i = 0; i < 3; i++) await sequence.locator('[data-action="train:line_rigger"]').click();
+    await expect(sequence.locator("p strong")).toHaveText("Scout a relay");
+    await act(page, "targets");
+    await act(page, "scout:cinder-yard");
+    await expect(page.locator('.nav [data-action="army"]')).toBeEnabled();
+    await navTo(page, "army");
+    await expect(page.locator("h1")).toHaveText("Compose breach force");
   });
 
   test("desktop: bounded production, construction, upgrade, training", async ({ page }) => {
@@ -376,7 +384,7 @@ test.describe.serial("Orbitscar vertical slice", () => {
       expect(box!.y).toBeGreaterThanOrEqual(0);
       expect(box!.y + box!.height).toBeLessThanOrEqual(844);
     }
-    await act(page, "train:line_rigger");
+    for (let i = 0; i < 3; i++) await act(page, "train:line_rigger");
     await navTo(page, "targets");
     await act(page, "scout:cinder-yard");
     await navTo(page, "army");
@@ -409,11 +417,13 @@ test.describe.serial("Orbitscar vertical slice", () => {
       await expect(readability).toHaveAttribute("aria-pressed", "true");
 
       const train = page.locator('[data-action="train:line_rigger"]');
+      await page.locator("details.colony-operations > summary").click();
       await train.scrollIntoViewIfNeeded();
       const box = await train.boundingBox();
       if (!box) throw new Error("line-rigger training control is not visible");
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
       await expect.poll(async () => (await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), storageKey))?.payload.reserves.line_rigger).toBe(1);
+      await expect(page.locator("details.colony-operations")).toHaveAttribute("open", "");
       await page.locator('[data-action="build:arc_projector"]').last().click();
       const canvas = page.locator("canvas");
       const canvasBox = await canvas.boundingBox();

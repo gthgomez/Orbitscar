@@ -25,10 +25,22 @@ describe("first-session UI and scouting", () => {
   it("leads a fresh colony through its next real objective and only shows Tier 1 training", () => {
     const html = render({ colony: createColony("fresh", content), session: createGameSession() });
     expect(html).toContain("Install a defense");
+    expect(html).toContain("Objective 1 of 6");
+    expect(html).not.toContain("Scout a relay");
     expect(html).toContain('data-action="build:arc_projector"');
     expect(html).toContain("Line Rigger");
     expect(html).not.toContain("needle drone");
     expect(html).not.toContain("relay drone");
+    expect(html).toContain('<details class="colony-operations">');
+    expect(html).not.toContain('<details class="colony-operations" open>');
+    expect(html).toContain('data-action="targets" disabled');
+    expect(html).toContain('data-action="army" disabled');
+  });
+
+  it("keeps the colony operations disclosure open across UI rerenders", () => {
+    const root = { innerHTML: "", querySelector: () => ({ open: true }) } as unknown as HTMLElement;
+    renderApp({ root, content, selectedTarget: content.encounters["cinder-yard"], notice: "", colony: createColony("open-operations", content), session: createGameSession() });
+    expect(root.innerHTML).toContain('<details class="colony-operations" open>');
   });
 
   it("shows raid escalation and the remaining defended engagements before the next band", () => {
@@ -105,9 +117,15 @@ describe("first-session UI and scouting", () => {
       replay: { kind: "attack" as const, input, result, attemptId: "live-readout", startedAt: 0, eventIndex, done: false },
     };
     const html = render({ colony: createColony("readout", content), session });
-    expect(html).toContain("Confirmed casualties: 0");
+    const confirmed = result.events.slice(0, eventIndex).filter((event) => event.type === "unit_destroyed").length;
+    expect(html).toContain(`Confirmed casualties: ${confirmed}`);
     expect(html).toContain("Defenses disabled: 0");
     expect(html).toContain("Salvage potential: Alloy 36 · Volatile 14 · Signal 6");
+    const battleHtml = render({ colony: createColony("readout-log", content), session: { ...session, replay: { ...session.replay!, eventIndex: result.events.length } } });
+    expect(battleHtml).not.toMatch(/unit_[a-z]+|defense_[a-z]+|#[0-9]+/);
+    expect(battleHtml).toContain("Battle concluded.");
+    expect(battleHtml).toContain('class="event-log" aria-live="off"');
+    expect(battleHtml).toContain('role="status" aria-live="polite"');
 
     const retreatInput: OrbitscarBattleInput = { ...input, commands: [...input.commands, { commandId: "retreat", sequence: 2, tick: 1, type: "RETREAT", payload: {} }] };
     const retreatResult = resolveOrbitscarBattle(retreatInput);

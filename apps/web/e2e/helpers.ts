@@ -18,6 +18,11 @@ export async function boot(page: Page): Promise<void> {
 export async function act(page: Page, action: string): Promise<void> {
   const button = page.locator(`[data-action="${action}"]`).last();
   await button.waitFor({ state: "attached" });
+  if (!(await button.isVisible())) {
+    const summary = page.locator("details.colony-operations > summary");
+    if (await summary.isVisible()) await summary.click();
+  }
+  await expect(button).toBeVisible();
   await expect(button).toBeEnabled();
   await button.click();
   await expect(page.locator(".shell")).toHaveAttribute("data-authority-busy", "false");

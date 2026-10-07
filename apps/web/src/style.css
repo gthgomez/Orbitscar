@@ -22,6 +22,11 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .nav button.active { color: #081018; background: #8ee6d1; border-color: #8ee6d1; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
 .card { padding: 11px; border: 1px solid #27414c; border-radius: 5px; background: rgba(17, 36, 46, .8); }
+.colony-operations { margin: 12px 0; border: 1px solid #27414c; border-radius: 5px; background: rgba(9, 21, 28, .58); }
+.colony-operations > summary { padding: 12px; color: #a9c7ce; cursor: pointer; font-size: 13px; }
+.colony-operations[open] > summary { border-bottom: 1px solid #27414c; color: #e4f3f0; }
+.colony-operations > :not(summary) { margin-inline: 10px; }
+.colony-operations > :last-child { margin-bottom: 10px; }
 .card.selected { border-color: #8ee6d1; box-shadow: inset 0 0 0 1px #8ee6d1; }
 .card h3 { margin: 0 0 5px; color: #edf8f5; font-size: 14px; }
 .building-select { display: grid; min-height: 0; padding: 0; border: 0; background: transparent; text-align: left; }

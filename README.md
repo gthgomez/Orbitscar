@@ -80,9 +80,14 @@ tests exercise multiple local profiles, concurrent attacks, duplicate
 settlement, PvE campaign progression, restart persistence, and replay
 reproduction. This API is not configured for public network use. Run one
 server process per database path.
-The local authority retains the latest 10,000 idempotency records and 250
-attack reports; profile and defender snapshot versions reject replayed stale
-mutations after an old idempotency record expires.
+The local authority retains up to 512 compressed idempotency responses (32 MB)
+and 250 attack reports. After a response expires, a retry with stale profile or
+snapshot versions is rejected; attack settlement IDs are derived from the
+attacker's next server profile version, so reusing an expired transport key
+cannot suppress one side of settlement. Browser mutation requests require
+`application/json` and an exact allowed `Origin`. The server defaults to local
+Vite/preview origins; set `ORBITSCAR_ALLOWED_ORIGINS` to a comma-separated list
+when serving the client from another local origin.
 
 Human blind-test instrumentation lives in `docs/playtest/` (protocol, observation form, session checklist); the item-10 gate remains BLOCKED_ON_HUMAN_PLAYTEST until five real sessions are recorded.
 

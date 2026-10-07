@@ -48,7 +48,7 @@ type ProfileRecord = { version: number; save: string };
 type RequestRecord = { fingerprint: string; statusCode: number; response: unknown; responseEncoding?: "deflate-json-v1"; attackId?: string };
 type AttackRecord = { requestId: string; attackerId: string; defenderId: string; attackerVersion: number; defenderVersion: number; snapshotHash: string; sectorNodeId?: string; input: OrbitscarBattleInput; result: ReturnType<typeof resolveOrbitscarBattle> };
 type ServerDatabase = { schemaVersion: number; profiles: Record<string, ProfileRecord>; requests: Record<string, RequestRecord>; attacks: Record<string, AttackRecord> };
-type ServerOptions = { databasePath: string; content?: OrbitscarContent };
+type ServerOptions = { databasePath: string; content?: OrbitscarContent; allowedOrigins?: string[] };
 
 class ApiError extends Error {
   constructor(readonly statusCode: number, message: string) { super(message); }
@@ -129,6 +129,7 @@ function parseCommands(value: unknown): OrbitscarCommand[] {
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
+  if (!/^application\/json(?:\s*;|$)/i.test(req.headers["content-type"] ?? "")) throw new ApiError(415, "content-type must be application/json");
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const rawChunk of req) {
@@ -231,6 +232,7 @@ function attackResponse(attackId: string, attack: AttackRecord) {
 
 export function createOrbitscarServer(options: ServerOptions): Server {
   const gameContent = options.content ?? content;
+  const allowedOrigins = new Set(options.allowedOrigins ?? ["http://localhost:4173", "http://127.0.0.1:4173", "http://localhost:5173", "http://127.0.0.1:5173"]);
   const databasePath = options.databasePath;
   mkdirSync(dirname(databasePath), { recursive: true });
   let database = initialDatabase();
@@ -274,6 +276,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
   }
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (req.method === "POST" && req.headers.origin && !allowedOrigins.has(req.headers.origin)) throw new ApiError(403, "origin is not allowed to mutate the local authority");
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     const path = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
     if (req.method === "GET" && path.length === 1 && path[0] === "health") return send(res, 200, { status: "ok", schemaVersion: SERVER_SCHEMA_VERSION, rulesetVersion: gameContent.rulesetVersion });
@@ -404,7 +407,8 @@ export function createOrbitscarServer(options: ServerOptions): Server {
           if (!unit) throw new ApiError(400, `army references unknown unit '${entry.unitId}'`);
           if (unit.requiredTier > Math.min(3, state.buildings.filter((building) => building.buildingId === "command_relay").reduce((tier, building) => Math.max(tier, building.level), 1))) throw new ApiError(400, `unit '${entry.unitId}' is locked for this command tier`);
         }
-        const seed = createHash("sha256").update(`${idempotencyId}:${targetId}:${expectedVersion}`).digest().readUInt32BE(0);
+        const attemptId = `${id}-pve-s${expectedVersion + 1}`;
+        const seed = createHash("sha256").update(`${attemptId}:${targetId}`).digest().readUInt32BE(0);
         const input: OrbitscarBattleInput = {
           canonicalFormatVersion: 2,
           rulesetVersion: gameContent.rulesetVersion,
@@ -425,8 +429,8 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         if (!validation.ok) throw new ApiError(400, validation.errors.join("; "));
         const result = resolveOrbitscarBattle(input);
         try { assertCommandsBeforeTerminal(input, result.durationTicks); } catch (error) { throw new ApiError(400, error instanceof Error ? error.message : "battle command occurs after battle end"); }
-        const settled = applyBattleResult(state, input, result, idempotencyId, targetId);
-        const response = { profileId: id, version: expectedVersion + 1, colony: settled, attemptId: idempotencyId, targetId, input, result, sector: settled.sector };
+        const settled = applyBattleResult(state, input, result, attemptId, targetId);
+        const response = { profileId: id, version: expectedVersion + 1, colony: settled, attemptId, targetId, input, result, sector: settled.sector };
         const next = structuredClone(database);
         next.profiles[id] = { version: expectedVersion + 1, save: serializeColony(settled) };
         next.requests[idempotencyId] = { fingerprint, statusCode: 201, response: compressResponse(response), responseEncoding: "deflate-json-v1" };
@@ -481,7 +485,10 @@ export function createOrbitscarServer(options: ServerOptions): Server {
           if (!unit) throw new ApiError(400, `army references unknown unit '${entry.unitId}'`);
           if (unit.requiredTier > Math.min(3, attackerState.buildings.filter((building) => building.buildingId === "command_relay").reduce((tier, building) => Math.max(tier, building.level), 1))) throw new ApiError(400, `unit '${entry.unitId}' is locked for this command tier`);
         }
-        const attackId = idempotencyId;
+        // The expiring transport idempotency cache may forget a client key. Keep
+        // settlement identity tied to the attacker's monotonic profile version
+        // so a later request reusing that key cannot suppress only one report.
+        const attackId = `${attackerId}-s${attackerVersion + 1}`;
         const seed = createHash("sha256").update(`${attackId}:${submittedSnapshotHash}:${attackerVersion}`).digest().readUInt32BE(0);
         const structures = defenderState.buildings.map((building) => ({ id: building.id, buildingId: building.buildingId, position: { ...building.position }, level: building.level, currentHealth: building.health }));
         const rewardPreview = Object.fromEntries(Object.entries(defenderState.resources).map(([id, amount]) => [id, Math.floor(amount)]));
@@ -510,7 +517,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         if (sectorNodeId !== undefined) settledAttacker = claimRivalSectorNode(settledAttacker, sectorNodeId, defenderId, result.winner, gameContent);
         let settledDefender = applyColonyDefenseResult(defenderState, input, result, attackId, atMs);
         for (const [resourceId, amount] of Object.entries(result.loot)) settledDefender.resources[resourceId] = Math.max(0, (settledDefender.resources[resourceId] ?? 0) - amount);
-        const attackRecord: AttackRecord = { requestId: idempotencyId, attackerId, defenderId, attackerVersion: attackerVersion + 1, defenderVersion: snapshotVersion, snapshotHash: submittedSnapshotHash, ...(sectorNodeId === undefined ? {} : { sectorNodeId }), input, result };
+        const attackRecord: AttackRecord = { requestId: attackId, attackerId, defenderId, attackerVersion: attackerVersion + 1, defenderVersion: snapshotVersion, snapshotHash: submittedSnapshotHash, ...(sectorNodeId === undefined ? {} : { sectorNodeId }), input, result };
         const response = attackResponse(attackId, attackRecord);
         const next = structuredClone(database);
         next.profiles[attackerId] = { version: attackerVersion + 1, save: serializeColony(settledAttacker) };
