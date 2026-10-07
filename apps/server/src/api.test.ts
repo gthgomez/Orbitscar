@@ -1,6 +1,7 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { deflateSync, inflateSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { authoritativeDigest, resolveOrbitscarBattle } from "@orbitscar/simulation";
 import { createOrbitscarServer } from "./api.js";
@@ -121,6 +122,32 @@ describe("authoritative asynchronous rival API", () => {
     expect(restartedDefender.data).toEqual(settledDefender.data);
   });
 
+  it("rejects corrupt compressed idempotency responses at startup", async () => {
+    await stop(running);
+    const malformed = {
+      schemaVersion: 2,
+      profiles: {},
+      requests: { broken: { fingerprint: "a".repeat(64), statusCode: 200, response: Buffer.from("not a deflate stream").toString("base64"), responseEncoding: "deflate-json-v1" } },
+      attacks: {},
+    };
+    await writeFile(join(directory, "server-state.json"), JSON.stringify(malformed));
+    expect(() => createOrbitscarServer({ databasePath: join(directory, "server-state.json") })).toThrow("stored request response is corrupt");
+    await unlink(join(directory, "server-state.json"));
+    running = await start();
+  });
+
+  it("rejects schema 2 request caches beyond the record bound", async () => {
+    await stop(running);
+    const response = deflateSync(Buffer.from(JSON.stringify({ ok: true }))).toString("base64");
+    const requests = Object.fromEntries(Array.from({ length: 513 }, (_, index) => [`request-${index}`, {
+      fingerprint: "b".repeat(64), statusCode: 200, response, responseEncoding: "deflate-json-v1",
+    }]));
+    await writeFile(join(directory, "server-state.json"), JSON.stringify({ schemaVersion: 2, profiles: {}, requests, attacks: {} }));
+    expect(() => createOrbitscarServer({ databasePath: join(directory, "server-state.json") })).toThrow("server request cache exceeds its record limit");
+    await unlink(join(directory, "server-state.json"));
+    running = await start();
+  });
+
   it("rejects stale snapshots and impossible deployment capacity without mutating either profile", async () => {
     await createProfile(running, "attacker");
     await createProfile(running, "defender");
@@ -204,6 +231,26 @@ describe("authoritative asynchronous rival API", () => {
     expect(first.data.result.winner).toBe("attacker");
     expect(resolveOrbitscarBattle(first.data.input).outcomeHash).toBe(first.data.result.outcomeHash);
     expect(first.data.sector.securedNodeIds).toContain("drift-lode");
+    type StoredRequest = { response: unknown; responseEncoding?: string };
+    const stored = JSON.parse(await readFile(join(directory, "server-state.json"), "utf8")) as { schemaVersion: number; requests: Record<string, StoredRequest> };
+    expect(stored.schemaVersion).toBe(2);
+    expect(stored.requests["campaign-drift-1"].responseEncoding).toBe("deflate-json-v1");
+    const encodedResponse = stored.requests["campaign-drift-1"].response as string;
+    const cachedResponse = JSON.parse(inflateSync(Buffer.from(encodedResponse, "base64")).toString("utf8"));
+    expect(cachedResponse.result.outcomeHash).toBe(first.data.result.outcomeHash);
+    expect(Buffer.byteLength(encodedResponse, "base64")).toBeLessThan(Buffer.byteLength(JSON.stringify(first.data)));
+    for (const request of Object.values(stored.requests)) {
+      if (request.responseEncoding === "deflate-json-v1") {
+        request.response = JSON.parse(inflateSync(Buffer.from(request.response as string, "base64")).toString("utf8"));
+        delete request.responseEncoding;
+      }
+    }
+    stored.schemaVersion = 1;
+    await writeFile(join(directory, "server-state.json"), JSON.stringify(stored));
+    await stop(running);
+    running = await start();
+    const health = await call<{ schemaVersion: number }>(running, "/health");
+    expect(health.data.schemaVersion).toBe(2);
     const duplicate = await call<typeof first.data>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
     expect(duplicate.status).toBe(200);
     expect(duplicate.data.result.outcomeHash).toBe(first.data.result.outcomeHash);
@@ -215,6 +262,9 @@ describe("authoritative asynchronous rival API", () => {
     expect(upgraded.status).toBe(200);
     const reinforced = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-retrain", expectedVersion: 5, action: { type: "TRAIN", unitId: "line_rigger", count: 10 } });
     expect(reinforced.status).toBe(200);
+    const migratedStored = JSON.parse(await readFile(join(directory, "server-state.json"), "utf8")) as { schemaVersion: number; requests: Record<string, StoredRequest> };
+    expect(migratedStored.schemaVersion).toBe(2);
+    expect(migratedStored.requests["campaign-drift-1"].responseEncoding).toBe("deflate-json-v1");
     const rivalSnapshot = await call<{ version: number; snapshotHash: string }>(running, "/profiles/local-rival-drift/snapshot");
     const rivalRequest = { ...attackRequest(rivalSnapshot.data, "campaign-player", "rival-drift-1", 10, reinforced.data.version), defenderId: "local-rival-drift", sectorNodeId: "rival-drift" };
     const rivalBattle = await call<{ result: { winner: string }; sectorNodeId?: string }>(running, "/attacks", "POST", rivalRequest);

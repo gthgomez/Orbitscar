@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { deflateSync, inflateSync } from "node:zlib";
 import balance from "@orbitscar/content/data/orbitscar-v0/balance.json" with { type: "json" };
 import { parseOrbitscarContent, type OrbitscarContent } from "@orbitscar/content";
 import {
@@ -32,16 +33,18 @@ import {
   type OrbitscarPosition,
 } from "@orbitscar/simulation";
 
-const SERVER_SCHEMA_VERSION = 1;
+const SERVER_SCHEMA_VERSION = 2;
 const MAX_BODY_BYTES = 1_000_000;
 const MAX_STORED_ATTACK_REPORTS = 250;
-const MAX_STORED_REQUESTS = 10_000;
+const MAX_STORED_REQUESTS = 512;
+const MAX_CACHED_RESPONSE_BYTES = 8_000_000;
+const MAX_REQUEST_CACHE_BYTES = 32_000_000;
 const DEPLOYMENT_CAPACITY = 10;
 const ARENA = { width: 1200, height: 800 };
 const content = parseOrbitscarContent(balance);
 
 type ProfileRecord = { version: number; save: string };
-type RequestRecord = { fingerprint: string; statusCode: number; response: unknown; attackId?: string };
+type RequestRecord = { fingerprint: string; statusCode: number; response: unknown; responseEncoding?: "deflate-json-v1"; attackId?: string };
 type AttackRecord = { requestId: string; attackerId: string; defenderId: string; attackerVersion: number; defenderVersion: number; snapshotHash: string; sectorNodeId?: string; input: OrbitscarBattleInput; result: ReturnType<typeof resolveOrbitscarBattle> };
 type ServerDatabase = { schemaVersion: number; profiles: Record<string, ProfileRecord>; requests: Record<string, RequestRecord>; attacks: Record<string, AttackRecord> };
 type ServerOptions = { databasePath: string; content?: OrbitscarContent };
@@ -148,9 +151,21 @@ function initialDatabase(): ServerDatabase {
 }
 
 function validateStoredDatabase(database: ServerDatabase): void {
+  if (Object.keys(database.requests).length > MAX_STORED_REQUESTS) throw new Error("server request cache exceeds its record limit");
+  let cacheBytes = 0;
   for (const [id, request] of Object.entries(database.requests)) {
-    if (typeof request !== "object" || request === null || !/^[a-f0-9]{64}$/.test(request.fingerprint) || ![200, 201].includes(request.statusCode) || typeof request.response !== "object" || request.response === null || (request.attackId !== undefined && typeof request.attackId !== "string")) {
+    const validResponse = request?.responseEncoding === "deflate-json-v1"
+      ? typeof request.response === "string" && /^[A-Za-z0-9+/]+=*$/.test(request.response)
+      : database.schemaVersion === 1 && request?.responseEncoding === undefined && typeof request?.response === "object" && request.response !== null;
+    if (typeof request !== "object" || request === null || !/^[a-f0-9]{64}$/.test(request.fingerprint) || ![200, 201].includes(request.statusCode) || !validResponse || (request.attackId !== undefined && typeof request.attackId !== "string")) {
       throw new Error(`request '${id}' has an invalid record`);
+    }
+    if (request.responseEncoding === "deflate-json-v1") {
+      cacheBytes += Buffer.byteLength(JSON.stringify([id, request]));
+      if (cacheBytes > MAX_REQUEST_CACHE_BYTES) throw new Error("server request cache exceeds its storage limit");
+      unpackResponse(request);
+    } else if (Array.isArray(request.response)) {
+      throw new Error(`request '${id}' has an invalid response`);
     }
   }
   for (const [id, attack] of Object.entries(database.attacks)) {
@@ -162,7 +177,13 @@ function validateStoredDatabase(database: ServerDatabase): void {
 
 function trimRequests(requests: Record<string, RequestRecord>): void {
   const ids = Object.keys(requests);
-  while (ids.length > MAX_STORED_REQUESTS) delete requests[ids.shift()!];
+  const recordBytes = (id: string) => Buffer.byteLength(JSON.stringify([id, requests[id]]));
+  let cacheBytes = ids.reduce((total, id) => total + recordBytes(id), 0);
+  while (ids.length > 0 && (ids.length > MAX_STORED_REQUESTS || cacheBytes > MAX_REQUEST_CACHE_BYTES)) {
+    const oldest = ids.shift()!;
+    cacheBytes -= recordBytes(oldest);
+    delete requests[oldest];
+  }
 }
 
 function profileState(database: ServerDatabase, profileId: string): ColonyState {
@@ -183,6 +204,23 @@ function snapshot(database: ServerDatabase, profileId: string, gameContent: Orbi
 }
 
 function requestFingerprint(value: unknown): string { return authoritativeDigest(value); }
+function compressResponse(response: unknown): string {
+  const json = JSON.stringify(response);
+  if (Buffer.byteLength(json) > MAX_CACHED_RESPONSE_BYTES) throw new Error("response exceeds the idempotency cache limit");
+  return deflateSync(Buffer.from(json)).toString("base64");
+}
+function unpackResponse(request: RequestRecord): unknown {
+  if (request.responseEncoding === undefined) return request.response;
+  if (request.responseEncoding !== "deflate-json-v1" || typeof request.response !== "string") throw new Error("stored request response encoding is invalid");
+  try {
+    const bytes = Buffer.from(request.response, "base64");
+    if (bytes.toString("base64") !== request.response) throw new Error("invalid base64");
+    const value = JSON.parse(inflateSync(bytes, { maxOutputLength: MAX_CACHED_RESPONSE_BYTES }).toString("utf8")) as unknown;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("cached response is not an object");
+    return value;
+  }
+  catch { throw new Error("stored request response is corrupt"); }
+}
 function requestId(value: unknown): string { return stringField(value, "requestId", /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/); }
 function profileId(value: unknown): string { return stringField(value, "profileId", /^[a-z0-9][a-z0-9-]{1,31}$/); }
 
@@ -201,7 +239,18 @@ export function createOrbitscarServer(options: ServerOptions): Server {
     catch { throw new Error("server database is not valid JSON"); }
     if (typeof stored !== "object" || stored === null || Array.isArray(stored)) throw new Error("server database must be an object");
     database = stored as ServerDatabase;
-    if (database.schemaVersion !== SERVER_SCHEMA_VERSION || typeof database.profiles !== "object" || database.profiles === null || Array.isArray(database.profiles) || typeof database.requests !== "object" || database.requests === null || Array.isArray(database.requests) || typeof database.attacks !== "object" || database.attacks === null || Array.isArray(database.attacks)) throw new Error("unsupported server database schema");
+    if (![1, SERVER_SCHEMA_VERSION].includes(database.schemaVersion) || typeof database.profiles !== "object" || database.profiles === null || Array.isArray(database.profiles) || typeof database.requests !== "object" || database.requests === null || Array.isArray(database.requests) || typeof database.attacks !== "object" || database.attacks === null || Array.isArray(database.attacks)) throw new Error("unsupported server database schema");
+    if (database.schemaVersion === 1) {
+      validateStoredDatabase(database);
+      for (const request of Object.values(database.requests)) {
+        if (typeof request === "object" && request !== null && request.responseEncoding === undefined) {
+          request.response = compressResponse(request.response);
+          request.responseEncoding = "deflate-json-v1";
+        }
+      }
+      trimRequests(database.requests);
+      database.schemaVersion = SERVER_SCHEMA_VERSION;
+    }
     for (const [id, profile] of Object.entries(database.profiles)) {
       if (typeof profile !== "object" || profile === null || !Number.isInteger(profile.version) || profile.version < 1 || typeof profile.save !== "string") throw new Error(`profile '${id}' has an invalid record`);
       const state = parseColonySave(profile.save);
@@ -270,7 +319,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
             const attack = database.attacks[prior.attackId];
             return attack ? send(res, 200, attackResponse(prior.attackId, attack)) : send(res, 410, { error: "attack was settled; its archived report has expired" });
           }
-          return send(res, 200, prior.response);
+          return send(res, 200, unpackResponse(prior));
         }
         const current = database.profiles[id];
         if (!current) throw new ApiError(404, `profile '${id}' was not found`);
@@ -315,7 +364,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const response = { profileId: id, version: expectedVersion + 1, colony: state };
         const next = structuredClone(database);
         next.profiles[id] = { version: expectedVersion + 1, save: serializeColony(state) };
-        next.requests[idempotencyId] = { fingerprint, statusCode: 200, response };
+        next.requests[idempotencyId] = { fingerprint, statusCode: 200, response: compressResponse(response), responseEncoding: "deflate-json-v1" };
         trimRequests(next.requests);
         persist(next);
         send(res, 200, response);
@@ -338,7 +387,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const prior = database.requests[idempotencyId];
         if (prior) {
           if (prior.fingerprint !== fingerprint) throw new ApiError(409, "requestId was already used for a different request");
-          return send(res, 200, prior.response);
+          return send(res, 200, unpackResponse(prior));
         }
         const current = database.profiles[id];
         if (!current) throw new ApiError(404, `profile '${id}' was not found`);
@@ -378,7 +427,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const response = { profileId: id, version: expectedVersion + 1, attemptId: idempotencyId, targetId, input, result, sector: settled.sector };
         const next = structuredClone(database);
         next.profiles[id] = { version: expectedVersion + 1, save: serializeColony(settled) };
-        next.requests[idempotencyId] = { fingerprint, statusCode: 201, response };
+        next.requests[idempotencyId] = { fingerprint, statusCode: 201, response: compressResponse(response), responseEncoding: "deflate-json-v1" };
         trimRequests(next.requests);
         persist(next);
         send(res, 201, response);
@@ -463,7 +512,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const next = structuredClone(database);
         next.profiles[attackerId] = { version: attackerVersion + 1, save: serializeColony(settledAttacker) };
         next.profiles[defenderId] = { version: snapshotVersion + 1, save: serializeColony(settledDefender) };
-        next.requests[idempotencyId] = { fingerprint, statusCode: 201, response: { attackId }, attackId };
+        next.requests[idempotencyId] = { fingerprint, statusCode: 201, response: compressResponse({ attackId }), responseEncoding: "deflate-json-v1", attackId };
         trimRequests(next.requests);
         next.attacks[attackId] = attackRecord;
         const attackIds = Object.keys(next.attacks);
