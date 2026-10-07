@@ -26,6 +26,7 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .building-select { display: grid; min-height: 0; padding: 0; border: 0; background: transparent; text-align: left; }
 .building-select:hover, .building-select:focus-visible { background: transparent; }
 .card .meta { color: #8eaab3; font-size: 11px; }
+.card .unit-weakness { margin-top: 4px; color: #ffb5a8; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
 .row + .row { margin-top: 8px; }
 .stack { display: grid; gap: 8px; }

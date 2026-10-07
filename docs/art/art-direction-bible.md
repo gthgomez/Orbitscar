@@ -33,3 +33,5 @@ The direction is acceptable only if a former player recognizes the broad colony-
 ## First production slice
 
 The initial replaceable presentation pack is a small set of original hand-authored SVG silhouettes under `apps/web/public/art/orbitscar`. It covers the command relay, extractor, arc projector, two representative units, and a deployment marker. Most scene rendering remains procedural geometry until asset integration is measured at phone and high-DPI sizes.
+
+The live Phaser scene now loads these silhouettes for colony modules, battle structures, representative units, and the selected approach. Weapon range circles use the same range data as the deterministic battle rules. Remaining buildings and units retain procedural placeholders until their original silhouette assets are authored.

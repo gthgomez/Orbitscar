@@ -76,6 +76,27 @@ as a counterfactual claim. Counter guidance is labeled as intel suggestion.
 Direct report tests cover offensive and defensive attribution. Human readability
 and usefulness remain unvalidated by blind playtest.
 
+## Declared unit weaknesses iteration — ruleset 0.4.0
+
+Fresh review of `docs/design/units-and-commanders.md` exposed that `unit.counters`
+describes defensive weapons that exploit a unit, not defenses that unit should
+damage faster. The previous resolver ignored those declarations. The shared
+resolver now applies 1.4× incoming direct and splash damage when a weapon listed
+in the unit's weaknesses hits it. Content validation rejects unknown weapon IDs;
+replay hashes include the changed ruleset/content; and the army screen names
+scouted defenses that threaten each available unit.
+
+Same-seed comparison: 4,928 plans (2,464 × 2 seed replicas), with zero
+invariant violations and 4,400 unique outcome hashes before and after. Screen-line
+win rate moved from 85.4% to 82.8%, while air-harass remained 83.2%; the gap
+narrowed from 2.2 to 0.4 points. Full-breach zero-casualty outcomes decreased
+from 24 to 18. Average losses rose 0.22 for screen-line and 0.30 for the
+ranged-fortress plan. The timing gap remains: immediate mass is 80.0%,
+probe-reinforce 71.8%, half-half 59.7%, and three waves 54.0%. Approach bias
+also persists: west 53.2%, south 73.3%, east 72.9%. The change improves
+counter readability and composition differentiation; it does not establish
+broad strategy parity or human fun.
+
 First T-001 baseline: **1,344 deterministic runs** (672 plans × 2 seed replicas)
 across all three authored encounters, seven force archetypes, four reinforcement
 timings, four approach zones, with and without the commander ability. Zero

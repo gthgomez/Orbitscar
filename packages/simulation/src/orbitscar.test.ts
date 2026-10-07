@@ -64,6 +64,26 @@ describe("Orbitscar deterministic spatial combat", () => {
     expect(coilImpacts.map((event) => event.entityId)).toContain("line_rigger#0");
   });
 
+  it("makes a listed defensive counter deal more damage to that unit", () => {
+    for (const matchup of [
+      { unitId: "line_rigger", defenseId: "scatter_coil", buildingId: "scatter_coil" },
+      { unitId: "pulse_marksman", defenseId: "arc_projector", buildingId: "arc_projector" },
+    ]) {
+      const drop: OrbitscarCommand = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: matchup.unitId, count: 1 }] } };
+      const structures = [
+        { id: "weapon", buildingId: matchup.buildingId, position: { x: 220, y: 400 } },
+        { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } },
+      ];
+      const counterResult = resolveOrbitscarBattle(inputWith([drop], { army: [{ unitId: matchup.unitId, count: 1 }], structures, seed: 31, maxDurationTicks: 40 }));
+      const uncoupledContent = structuredClone(content);
+      uncoupledContent.units[matchup.unitId].counters = [];
+      const uncoupledResult = resolveOrbitscarBattle(inputWith([drop], { army: [{ unitId: matchup.unitId, count: 1 }], structures, content: uncoupledContent, seed: 31, maxDurationTicks: 40 }));
+      const counterHit = counterResult.events.find((event) => event.type === "unit_damaged" && event.targetId === "weapon");
+      const ordinaryHit = uncoupledResult.events.find((event) => event.type === "unit_damaged" && event.targetId === "weapon");
+      expect(counterHit?.value, `${matchup.unitId} should be vulnerable to ${matchup.defenseId}`).toBeGreaterThan(ordinaryHit?.value ?? 0);
+    }
+  });
+
   it("records doctrines in the canonical snapshot and applies their combat specialization", () => {
     const drop = { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 4 }] } };
     const army = [{ unitId: "line_rigger", count: 4 }];
@@ -169,10 +189,10 @@ describe("Orbitscar deterministic spatial combat", () => {
   it("replans a disconnected route after attackers destroy a blocking module", () => {
     const wall = Array.from({ length: 20 }, (_, index) => ({ id: `wall-${index}`, buildingId: "scatter_coil", position: { x: 480, y: index * 40 } }));
     const result = resolveOrbitscarBattle(inputWith([
-      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 8 }, { unitId: "salvage_hauler", count: 1 }] } },
+      { commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 100, y: 400 }, units: [{ unitId: "pulse_marksman", count: 8 }, { unitId: "salvage_hauler", count: 1 }] } },
       { commandId: "focus", sequence: 2, tick: 30, type: "COMMANDER_ABILITY", payload: { abilityId: "emergency_reroute", targetStructureId: "wall-10" } },
     ], {
-      army: [{ unitId: "line_rigger", count: 8 }, { unitId: "salvage_hauler", count: 1 }],
+      army: [{ unitId: "pulse_marksman", count: 8 }, { unitId: "salvage_hauler", count: 1 }],
       structures: [{ id: "extractor", buildingId: "matter_extractor", position: { x: 900, y: 400 } }, { id: "relay", buildingId: "command_relay", position: { x: 1000, y: 400 } }, ...wall],
       deploymentCapacity: 10,
       maxDurationTicks: 1200,

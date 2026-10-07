@@ -284,6 +284,11 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
   for (const defense of Object.values(defenses)) {
     if (buildings[defense.buildingId] === undefined) throw new Error(`defense '${defense.id}' references unknown building '${defense.buildingId}'`);
   }
+  for (const unit of Object.values(units)) {
+    for (const counter of unit.counters) {
+      if (defenses[counter] === undefined) throw new Error(`unit '${unit.id}' references unknown counter '${counter}'`);
+    }
+  }
   for (const commander of Object.values(commanders)) {
     if (abilities[commander.abilityId] === undefined) throw new Error(`commander '${commander.id}' references unknown ability '${commander.abilityId}'`);
   }

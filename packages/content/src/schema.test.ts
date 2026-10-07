@@ -58,4 +58,10 @@ describe("Orbitscar progression content", () => {
     invalidOpponentTier.encounters["cinder-yard"].opponentTier = 1;
     expect(() => parseOrbitscarContent(invalidOpponentTier)).toThrow("above opponentTier");
   });
+
+  it("rejects unit counters that do not name a defensive weapon", () => {
+    const invalidCounter = structuredClone(source);
+    invalidCounter.units.pulse_marksman.counters = ["missing_weapon"];
+    expect(() => parseOrbitscarContent(invalidCounter)).toThrow("unknown counter 'missing_weapon'");
+  });
 });

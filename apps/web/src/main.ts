@@ -6,9 +6,11 @@ import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
 import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
 import { renderApp } from "./ui/render.js";
+import { createSoundPlayer } from "./audio.js";
 import "./style.css";
 
 const content = parseOrbitscarContent(balance);
+const playSound = createSoundPlayer();
 const root: HTMLElement = (() => {
   const candidate = document.querySelector<HTMLElement>("#ui-root");
   if (candidate === null) throw new Error("missing #ui-root");
@@ -206,6 +208,14 @@ function onFrame(now: number): void {
   const elapsedTicks = Math.floor((now - replay.startedAt) / 1000 * 30);
   let eventIndex = replay.eventIndex;
   while (eventIndex < replay.result.events.length && replay.result.events[eventIndex].tick <= elapsedTicks) eventIndex += 1;
+  if (eventIndex > replay.eventIndex) {
+    for (const event of replay.result.events.slice(replay.eventIndex, eventIndex)) {
+      if (event.type === "deployed") playSound("deploy", colony.settings.muted);
+      else if (event.type === "ability") playSound("ability", colony.settings.muted);
+      else if (event.type === "unit_destroyed" || event.type === "defense_destroyed") playSound("impact", colony.settings.muted);
+      else if (event.type === "battle_ended") playSound(replay.result.winner === (replay.kind === "defense" ? "defender" : "attacker") ? "victory" : "defeat", colony.settings.muted);
+    }
+  }
   const currentTick = Math.min(replay.input.maxDurationTicks, elapsedTicks);
   const done = currentTick >= replay.result.durationTicks;
   if (eventIndex !== replay.eventIndex || done !== replay.done || currentTick !== replay.currentTick) { session = { ...session, replay: { ...replay, eventIndex, done, currentTick } }; if (eventIndex !== replay.eventIndex && !colony.reports.some((report) => report.attemptId === replay.attemptId)) persistActiveBattle(); if (eventIndex !== replay.eventIndex || done) { if (currentTick - lastUiReplayTick >= 15 || done) { lastUiReplayTick = Math.min(currentTick, replay.result.durationTicks); refresh(); } } }
@@ -233,6 +243,7 @@ function handleAction(action: string): void {
   }
   if (action === "simulate-raid") { startColonyRaid(); return; }
   if (action === "toggle-readability") { colony = { ...colony, settings: { ...colony.settings, reducedMotion: !colony.settings.reducedMotion } }; saveColony(colony.settings.reducedMotion ? "Low-effects readability mode on: calmer tactical updates, all gameplay information preserved." : "Standard effects restored."); return; }
+  if (action === "toggle-audio") { colony = { ...colony, settings: { ...colony.settings, muted: !colony.settings.muted } }; saveColony(colony.settings.muted ? "Sound muted." : "Sound enabled."); return; }
   if (verb === "scout" && value && content.encounters[value] && content.encounters[value].requiredTier <= commandTierOf(colony)) { try { selectedTarget = content.encounters[value]; colony = recordColonyScout(colony, value, content); saveColony(`${selectedTarget.name} intel recorded.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Scouting failed."); } return; }
   if (verb === "train" && value) { try { colony = trainUnits(colony, value, 1, content); saveColony(`${displayName(value)} added to reserves.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Training failed."); } return; }
   if (verb === "build" && value && content.buildings[value]) { buildMode = value; selectedBuildingId = undefined; setNotice(`Placement mode: ${displayName(value)}. Tap an open grid cell.`); return; }
@@ -262,7 +273,7 @@ function placeBuilding(position: { x: number; y: number }): void {
   catch (error) { setNotice(error instanceof Error ? error.message : "Placement rejected."); }
 }
 
-root.addEventListener("click", (event) => { const target = event.target as HTMLElement; const actionElement = target.closest<HTMLElement>("[data-action]"); if (actionElement?.dataset.action) handleAction(actionElement.dataset.action); });
+root.addEventListener("click", (event) => { const target = event.target as HTMLElement; const actionElement = target.closest<HTMLElement>("[data-action]"); if (actionElement?.dataset.action) { handleAction(actionElement.dataset.action); playSound("ui", colony.settings.muted); } });
 
 restoreActiveBattle();
 new Phaser.Game({ type: Phaser.AUTO, parent: "game", backgroundColor: "#081018", scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH, width: ARENA.width, height: ARENA.height }, input: { activePointers: 3 }, scene: new OrbitscarScene({ content, getMode: () => session.mode, getColony: () => colony, getBuildMode: () => buildMode, getSelectedBuildingId: () => selectedBuildingId, getSelectedZone: () => session.plan.selectedZone, getTargetStructures: () => selectedTarget.structures, getReplay: () => session.replay, isReducedMotion: () => colony.settings.reducedMotion, setPreview: (position) => { previewPosition = position; }, selectBuilding: (id) => { selectedBuildingId = id; refresh(); }, selectZone: (zone) => { updatePlan({ ...session.plan, selectedZone: zone }); }, placeBuilding, onFrame }) });

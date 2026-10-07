@@ -35,3 +35,4 @@ Commanders are earned through objectives, never randomized. Their abilities modi
 - Silhouette and behavior remain readable at phone scale.
 - Damage type, armor, and target tags are shown in plain language.
 - Initial balance uses small integer parameters in machine-readable data, not UI code.
+- A unit's listed defensive counters are its weaknesses: matching defenses deal 40% more direct and splash damage to that unit. Scouting reveals those defenses, and force composition surfaces the matching risk before deployment.

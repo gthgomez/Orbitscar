@@ -15,6 +15,13 @@ function render(context: Partial<RenderContext> & Pick<RenderContext, "session" 
 }
 
 describe("first-session UI and scouting", () => {
+  it("exposes the saved sound preference as an accessible mute toggle", () => {
+    const colony = { ...createColony("fresh", content), settings: { muted: true, reducedMotion: false } };
+    const html = render({ colony, session: createGameSession() });
+    expect(html).toContain('data-action="toggle-audio" aria-pressed="true"');
+    expect(html).toContain("Sound off");
+  });
+
   it("leads a fresh colony through its next real objective and only shows Tier 1 training", () => {
     const html = render({ colony: createColony("fresh", content), session: createGameSession() });
     expect(html).toContain("Install a defense");
@@ -39,9 +46,17 @@ describe("first-session UI and scouting", () => {
 
     const scouted = recordColonyScout(colony, "cinder-yard", content);
     const revealed = render({ colony: scouted, session });
-    expect(revealed).toContain("Counter hints:");
+    expect(revealed).toContain("Suggested units:");
     expect(revealed).toContain("scatter (190 range)");
     expect(revealed).toContain('data-action="army"');
     expect(revealed).not.toContain('data-action="army" disabled');
+  });
+
+  it("shows unit weaknesses from the scouted target while composing", () => {
+    const colony = recordColonyScout(createColony("fresh", content), "cinder-yard", content);
+    const session = { ...createGameSession(), mode: "army" as const };
+    const html = render({ colony, session });
+    expect(html).toContain("Vulnerable to Scatter Coil");
+    expect(html).toContain("Vulnerable to Arc Projector");
   });
 });
