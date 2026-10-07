@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrbitscarContent } from "@orbitscar/content";
 import { applyBattleResult, advanceColony, collectColonyProduction, commandTierOf, createColony, parseColonySave, placeColonyBuilding, recordColonyScout, researchDoctrine, selectColonyCommander, serializeColony, trainUnits, upgradeColonyBuilding } from "./colony.js";
+import { claimSectorNode } from "./sector.js";
 import { parseOrbitscarBattleScenario, resolveOrbitscarBattle } from "./orbitscar.js";
 import { authoritativeDigest } from "./hash.js";
 
@@ -54,8 +55,9 @@ describe("Orbitscar persistent colony loop", () => {
     const v3Payload = { ...oldPayload, schemaVersion: 3 };
     const legacySave = JSON.stringify({ schemaVersion: 3, payload: v3Payload, checksum: authoritativeDigest(v3Payload) });
     const migrated = parseColonySave(legacySave);
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
     expect(migrated.productionUpdatedAt).toBe(initial.updatedAt);
+    expect(migrated.sector.securedNodeIds).toEqual([]);
   });
 
   it("persists commander selection and migrates legacy saves to Mara", () => {
@@ -121,7 +123,8 @@ describe("Orbitscar persistent colony loop", () => {
     const tierThree = upgradeColonyBuilding(tierTwo, "command-relay-1", content);
     expect(commandTierOf(tierThree)).toBe(3);
     expect(trainUnits(tierThree, "relay_drone", 1, content).reserves.relay_drone).toBe(1);
-    expect(recordColonyScout(tierThree, "quiet-orbit", content).scoutedTargets).toContain("quiet-orbit");
+    const onFrontier = claimSectorNode(tierThree, "cinder-yard", "attacker", content);
+    expect(recordColonyScout(onFrontier, "quiet-orbit", content).scoutedTargets).toContain("quiet-orbit");
     expect(() => upgradeColonyBuilding(tierThree, "command-relay-1", content)).toThrow("maximum");
   });
 
@@ -136,8 +139,9 @@ describe("Orbitscar persistent colony loop", () => {
     const input = parseOrbitscarBattleScenario(fixture, content);
     const battleInput = { ...input, army: [{ unitId: "line_rigger", count: 3 }], commands: [{ commandId: "drop", sequence: 1, tick: 0, type: "DEPLOY" as const, payload: { zone: "west" as const, position: { x: 100, y: 400 }, units: [{ unitId: "line_rigger", count: 3 }] } }] };
     const result = resolveOrbitscarBattle(battleInput);
-    colony = applyBattleResult(colony, battleInput, result, "tutorial-attack");
+    colony = applyBattleResult(colony, battleInput, result, "tutorial-attack", "cinder-yard");
     expect(colony.completedObjectives).toContain("first-sortie");
+    expect(colony.sector.securedNodeIds.includes("cinder-yard")).toBe(result.winner === "attacker");
     expect(parseColonySave(serializeColony(colony)).completedObjectives).toEqual(colony.completedObjectives);
   });
 

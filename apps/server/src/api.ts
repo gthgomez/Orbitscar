@@ -7,6 +7,9 @@ import { parseOrbitscarContent, type OrbitscarContent } from "@orbitscar/content
 import {
   applyBattleResult,
   applyColonyDefenseResult,
+  claimRivalSectorNode,
+  getSectorNodeState,
+  SECTOR_NODES,
   authoritativeDigest,
   collectColonyProduction,
   createColony,
@@ -17,6 +20,7 @@ import {
   researchDoctrine,
   resolveOrbitscarBattle,
   selectColonyCommander,
+  sectorRewardPreview,
   serializeColony,
   settleColonyProduction,
   trainUnits,
@@ -38,7 +42,7 @@ const content = parseOrbitscarContent(balance);
 
 type ProfileRecord = { version: number; save: string };
 type RequestRecord = { fingerprint: string; statusCode: number; response: unknown; attackId?: string };
-type AttackRecord = { requestId: string; attackerId: string; defenderId: string; attackerVersion: number; defenderVersion: number; snapshotHash: string; input: OrbitscarBattleInput; result: ReturnType<typeof resolveOrbitscarBattle> };
+type AttackRecord = { requestId: string; attackerId: string; defenderId: string; attackerVersion: number; defenderVersion: number; snapshotHash: string; sectorNodeId?: string; input: OrbitscarBattleInput; result: ReturnType<typeof resolveOrbitscarBattle> };
 type ServerDatabase = { schemaVersion: number; profiles: Record<string, ProfileRecord>; requests: Record<string, RequestRecord>; attacks: Record<string, AttackRecord> };
 type ServerOptions = { databasePath: string; content?: OrbitscarContent };
 
@@ -183,7 +187,7 @@ function requestId(value: unknown): string { return stringField(value, "requestI
 function profileId(value: unknown): string { return stringField(value, "profileId", /^[a-z0-9][a-z0-9-]{1,31}$/); }
 
 function attackResponse(attackId: string, attack: AttackRecord) {
-  return { attackId, attackerId: attack.attackerId, defenderId: attack.defenderId, attackerVersion: attack.attackerVersion, defenderVersion: attack.defenderVersion + 1, snapshotVersion: attack.defenderVersion, snapshotHash: attack.snapshotHash, input: attack.input, result: attack.result };
+  return { attackId, attackerId: attack.attackerId, defenderId: attack.defenderId, attackerVersion: attack.attackerVersion, defenderVersion: attack.defenderVersion + 1, snapshotVersion: attack.defenderVersion, snapshotHash: attack.snapshotHash, ...(attack.sectorNodeId === undefined ? {} : { sectorNodeId: attack.sectorNodeId }), input: attack.input, result: attack.result };
 }
 
 export function createOrbitscarServer(options: ServerOptions): Server {
@@ -244,6 +248,11 @@ export function createOrbitscarServer(options: ServerOptions): Server {
       const id = stringField(path[1], "profileId", /^[a-z0-9][a-z0-9-]{1,31}$/);
       const value = snapshot(database, id, gameContent);
       return send(res, 200, { ...value, snapshotId: `${id}@${value.version}:${value.snapshotHash}` });
+    }
+    if (req.method === "GET" && path.length === 3 && path[0] === "profiles" && path[2] === "sector") {
+      const id = stringField(path[1], "profileId", /^[a-z0-9][a-z0-9-]{1,31}$/);
+      const state = profileState(database, id);
+      return send(res, 200, { profileId: id, version: database.profiles[id].version, nodes: SECTOR_NODES.map((node) => ({ ...node, status: getSectorNodeState(state, node.id, gameContent) })) });
     }
     if (req.method === "POST" && path.length === 3 && path[0] === "profiles" && path[2] === "actions") {
       const id = stringField(path[1], "profileId", /^[a-z0-9][a-z0-9-]{1,31}$/);
@@ -312,9 +321,72 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         send(res, 200, response);
       });
     }
+    if (req.method === "POST" && path.length === 3 && path[0] === "profiles" && path[2] === "campaign-attacks") {
+      const id = stringField(path[1], "profileId", /^[a-z0-9][a-z0-9-]{1,31}$/);
+      const body = record(await readJson(req), "body");
+      requireKeys(body, ["requestId", "expectedVersion", "targetId", "army", "commands"], "body");
+      const idempotencyId = requestId(body.requestId);
+      const expectedVersion = intField(body.expectedVersion, "expectedVersion", 1);
+      const targetId = stringField(body.targetId, "targetId");
+      const target = gameContent.encounters[targetId];
+      if (!target) throw new ApiError(404, `campaign target '${targetId}' was not found`);
+      const army = parseArmy(body.army);
+      const commands = parseCommands(body.commands);
+      if (!commands.some((command) => command.type === "DEPLOY")) throw new ApiError(400, "attack command stream must contain a deployment");
+      const fingerprint = requestFingerprint({ profileId: id, body });
+      return transaction(() => {
+        const prior = database.requests[idempotencyId];
+        if (prior) {
+          if (prior.fingerprint !== fingerprint) throw new ApiError(409, "requestId was already used for a different request");
+          return send(res, 200, prior.response);
+        }
+        const current = database.profiles[id];
+        if (!current) throw new ApiError(404, `profile '${id}' was not found`);
+        if (current.version !== expectedVersion) throw new ApiError(409, `stale profile version: expected ${expectedVersion}, current ${current.version}`);
+        if (!profileState(database, id).scoutedTargets.includes(targetId)) throw new ApiError(400, `campaign target '${targetId}' must be scouted before attack`);
+        const sectorNode = SECTOR_NODES.find((node) => node.encounterId === targetId);
+        if (sectorNode && !["frontier", "secured"].includes(getSectorNodeState(profileState(database, id), sectorNode.id, gameContent))) throw new ApiError(409, `campaign target '${targetId}' is behind locked relay lanes`);
+        const atMs = Date.now();
+        const state = settleColonyProduction(profileState(database, id), atMs, gameContent);
+        for (const entry of army) {
+          if ((state.reserves[entry.unitId] ?? 0) < entry.count) throw new ApiError(400, `army exceeds current '${entry.unitId}' reserves`);
+          const unit = gameContent.units[entry.unitId];
+          if (!unit) throw new ApiError(400, `army references unknown unit '${entry.unitId}'`);
+          if (unit.requiredTier > Math.min(3, state.buildings.filter((building) => building.buildingId === "command_relay").reduce((tier, building) => Math.max(tier, building.level), 1))) throw new ApiError(400, `unit '${entry.unitId}' is locked for this command tier`);
+        }
+        const seed = createHash("sha256").update(`${idempotencyId}:${targetId}:${expectedVersion}`).digest().readUInt32BE(0);
+        const input: OrbitscarBattleInput = {
+          canonicalFormatVersion: 2,
+          rulesetVersion: gameContent.rulesetVersion,
+          seed,
+          maxDurationTicks: 2400,
+          arena: ARENA,
+          deploymentCapacity: DEPLOYMENT_CAPACITY,
+          maxDeploymentCharges: 3,
+          commanderId: state.commanderId,
+          attackerDoctrineId: state.doctrineId,
+          army,
+          structures: target.structures.map((structure) => ({ ...structure, position: { ...structure.position } })),
+          commands,
+          rewardPreview: sectorRewardPreview(state, targetId, gameContent),
+          content: gameContent,
+        };
+        const validation = validateOrbitscarInput(input);
+        if (!validation.ok) throw new ApiError(400, validation.errors.join("; "));
+        const result = resolveOrbitscarBattle(input);
+        const settled = applyBattleResult(state, input, result, idempotencyId, targetId);
+        const response = { profileId: id, version: expectedVersion + 1, attemptId: idempotencyId, targetId, input, result, sector: settled.sector };
+        const next = structuredClone(database);
+        next.profiles[id] = { version: expectedVersion + 1, save: serializeColony(settled) };
+        next.requests[idempotencyId] = { fingerprint, statusCode: 201, response };
+        trimRequests(next.requests);
+        persist(next);
+        send(res, 201, response);
+      });
+    }
     if (req.method === "POST" && path.length === 1 && path[0] === "attacks") {
       const body = record(await readJson(req), "body");
-      requireKeys(body, ["requestId", "attackerId", "defenderId", "attackerVersion", "snapshotVersion", "snapshotHash", "army", "commands"], "body");
+      requireKeys(body, ["requestId", "attackerId", "defenderId", "attackerVersion", "snapshotVersion", "snapshotHash", "army", "commands", "sectorNodeId"], "body");
       const idempotencyId = requestId(body.requestId);
       const attackerId = stringField(body.attackerId, "attackerId", /^[a-z0-9][a-z0-9-]{1,31}$/);
       const defenderId = stringField(body.defenderId, "defenderId", /^[a-z0-9][a-z0-9-]{1,31}$/);
@@ -322,6 +394,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
       const attackerVersion = intField(body.attackerVersion, "attackerVersion", 1);
       const snapshotVersion = intField(body.snapshotVersion, "snapshotVersion", 1);
       const submittedSnapshotHash = stringField(body.snapshotHash, "snapshotHash");
+      const sectorNodeId = body.sectorNodeId === undefined ? undefined : stringField(body.sectorNodeId, "sectorNodeId");
       const army = parseArmy(body.army);
       const commands = parseCommands(body.commands);
       if (!commands.some((command) => command.type === "DEPLOY")) throw new ApiError(400, "attack command stream must contain a deployment");
@@ -342,6 +415,11 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         if (attackerRecord.version !== attackerVersion) throw new ApiError(409, `stale attacker version: expected ${attackerVersion}, current ${attackerRecord.version}`);
         const defenderSnapshot = snapshot(database, defenderId, gameContent);
         if (defenderSnapshot.version !== snapshotVersion || defenderSnapshot.snapshotHash !== submittedSnapshotHash) throw new ApiError(409, `stale defender snapshot: current version is ${defenderSnapshot.version}`);
+        if (sectorNodeId !== undefined) {
+          const node = SECTOR_NODES.find((entry) => entry.id === sectorNodeId && entry.kind === "rival");
+          if (!node || node.rivalProfileId !== defenderId) throw new ApiError(400, `defender '${defenderId}' does not own rival sector node '${sectorNodeId}'`);
+          if (getSectorNodeState(profileState(database, attackerId), sectorNodeId, gameContent) !== "rival-frontier") throw new ApiError(409, `rival sector node '${sectorNodeId}' is not on the connected frontier`);
+        }
 
         const atMs = Date.now();
         const attackerState = settleColonyProduction(profileState(database, attackerId), atMs, gameContent);
@@ -376,10 +454,11 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         const validation = validateOrbitscarInput(input);
         if (!validation.ok) throw new ApiError(400, validation.errors.join("; "));
         const result = resolveOrbitscarBattle(input);
-        const settledAttacker = applyBattleResult(attackerState, input, result, attackId);
+        let settledAttacker = applyBattleResult(attackerState, input, result, attackId);
+        if (sectorNodeId !== undefined) settledAttacker = claimRivalSectorNode(settledAttacker, sectorNodeId, defenderId, result.winner, gameContent);
         let settledDefender = applyColonyDefenseResult(defenderState, input, result, attackId, atMs);
         for (const [resourceId, amount] of Object.entries(result.loot)) settledDefender.resources[resourceId] = Math.max(0, (settledDefender.resources[resourceId] ?? 0) - amount);
-        const attackRecord: AttackRecord = { requestId: idempotencyId, attackerId, defenderId, attackerVersion: attackerVersion + 1, defenderVersion: snapshotVersion, snapshotHash: submittedSnapshotHash, input, result };
+        const attackRecord: AttackRecord = { requestId: idempotencyId, attackerId, defenderId, attackerVersion: attackerVersion + 1, defenderVersion: snapshotVersion, snapshotHash: submittedSnapshotHash, ...(sectorNodeId === undefined ? {} : { sectorNodeId }), input, result };
         const response = attackResponse(attackId, attackRecord);
         const next = structuredClone(database);
         next.profiles[attackerId] = { version: attackerVersion + 1, save: serializeColony(settledAttacker) };
@@ -404,7 +483,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
   return createServer((req, res) => {
     void handle(req, res).catch((error: unknown) => {
       if (res.headersSent) return res.destroy(error instanceof Error ? error : undefined);
-      const statusCode = error instanceof ApiError ? error.statusCode : error instanceof Error && (error.message.includes("insufficient") || error.message.includes("requires") || error.message.includes("already committed") || error.message.includes("unknown") || error.message.includes("outside") || error.message.includes("overlaps") || error.message.includes("does not need")) ? 400 : 500;
+      const statusCode = error instanceof ApiError ? error.statusCode : error instanceof Error && (error.message.includes("insufficient") || error.message.includes("requires") || error.message.includes("already committed") || error.message.includes("unknown") || error.message.includes("outside") || error.message.includes("overlaps") || error.message.includes("does not need") || error.message.includes("sector") || error.message.includes("rival node")) ? 400 : 500;
       send(res, statusCode, { error: error instanceof Error ? error.message : "unknown server error" });
     });
   });

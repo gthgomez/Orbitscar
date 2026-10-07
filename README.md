@@ -45,19 +45,25 @@ The server binds to `127.0.0.1:4179` and stores versioned data at
 - `POST /profiles` to create a local profile;
 - `GET /profiles/:id` and `GET /profiles/:id/snapshot` to inspect an identity
   and receive a versioned, hashed base snapshot;
+- `GET /profiles/:id/sector` to inspect connected PvE and rival relay nodes;
 - `POST /profiles/:id/actions` for validated `TRAIN`, `BUILD`, `UPGRADE`,
   `RESEARCH`, `COMMANDER`, `SCOUT`, `COLLECT`, and `REPAIR` actions;
+- `POST /profiles/:id/campaign-attacks` to resolve scouted PvE sorties through
+  the shared simulation and claim a connected relay when its command core falls;
 - `POST /attacks` with attacker/defender versions, the defender snapshot hash,
   an army drawn from server reserves, and an ordered command stream. The
-  server builds the battle input and resolves it through the shared simulation;
+  server builds the battle input and resolves it through the shared simulation.
+  Set `sectorNodeId` to attack the matching local rival relay; the defender ID
+  must match that node and the node must be connected to the attacker frontier;
 - `GET /attacks/:id` to retrieve a persisted deterministic report and replay.
 
 Mutations require an idempotency `requestId` and expected profile version.
 Attacks settle both colonies atomically and reject stale snapshots, invalid
 capacity, unknown units, and client-supplied results. Direct HTTP integration
 tests exercise multiple local profiles, concurrent attacks, duplicate
-settlement, restart persistence, and replay reproduction. This API is not
-configured for public network use. Run one server process per database path.
+settlement, PvE campaign progression, restart persistence, and replay
+reproduction. This API is not configured for public network use. Run one
+server process per database path.
 The local authority retains the latest 10,000 idempotency records and 250
 attack reports; profile and defender snapshot versions reject replayed stale
 mutations after an old idempotency record expires.

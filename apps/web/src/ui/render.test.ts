@@ -28,6 +28,9 @@ describe("first-session UI and scouting", () => {
     const colony = createColony("fresh", content);
     const session = { ...createGameSession(), mode: "targets" as const };
     const unknown = render({ colony, session });
+    expect(unknown).toContain('aria-label="Relay sector map showing connected frontier, secured, and rival nodes"');
+    expect(unknown).toContain("RIVAL DRIFT EXCHANGE");
+    expect(unknown).toContain("cinder-yard");
     expect(unknown).toContain("Scout target · 5 SIG");
     expect(unknown).toContain("Signal shadow");
     expect(unknown).not.toContain("Counter hints:");

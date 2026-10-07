@@ -190,4 +190,52 @@ describe("authoritative asynchronous rival API", () => {
     expect(attacker.data.colony.reports.filter((report) => report.attemptId === "same-concurrent-request")).toHaveLength(1);
     expect(defender.data.colony.reports.filter((report) => report.attemptId === "same-concurrent-request")).toHaveLength(1);
   });
+
+  it("resolves PvE campaign attacks on the server and persists relay ownership", async () => {
+    await createProfile(running, "campaign-player");
+    await createProfile(running, "local-rival-drift");
+    const trained = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-train", expectedVersion: 1, action: { type: "TRAIN", unitId: "line_rigger", count: 10 } });
+    expect(trained.status).toBe(200);
+    const scouted = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-scout", expectedVersion: 2, action: { type: "SCOUT", targetId: "drift-lode" } });
+    expect(scouted.status).toBe(200);
+    const attack = { requestId: "campaign-drift-1", expectedVersion: 3, targetId: "drift-lode", army: [{ unitId: "line_rigger", count: 10 }], commands: [{ commandId: "opening", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 10 }] } }] };
+    const first = await call<{ result: { outcomeHash: string; victoryTier: string; winner: string }; input: Parameters<typeof resolveOrbitscarBattle>[0]; sector: { securedNodeIds: string[] } }>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
+    expect(first.status).toBe(201);
+    expect(first.data.result.winner).toBe("attacker");
+    expect(resolveOrbitscarBattle(first.data.input).outcomeHash).toBe(first.data.result.outcomeHash);
+    expect(first.data.sector.securedNodeIds).toContain("drift-lode");
+    const duplicate = await call<typeof first.data>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.data.result.outcomeHash).toBe(first.data.result.outcomeHash);
+    const sector = await call<{ nodes: Array<{ id: string; status: string }> }>(running, "/profiles/campaign-player/sector");
+    expect(sector.status).toBe(200);
+    expect(sector.data.nodes.find((node) => node.id === "drift-lode")?.status).toBe("secured");
+
+    const upgraded = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-relay-tier", expectedVersion: 4, action: { type: "UPGRADE", buildingId: "command-relay-1" } });
+    expect(upgraded.status).toBe(200);
+    const reinforced = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-retrain", expectedVersion: 5, action: { type: "TRAIN", unitId: "line_rigger", count: 10 } });
+    expect(reinforced.status).toBe(200);
+    const rivalSnapshot = await call<{ version: number; snapshotHash: string }>(running, "/profiles/local-rival-drift/snapshot");
+    const rivalRequest = { ...attackRequest(rivalSnapshot.data, "campaign-player", "rival-drift-1", 10, reinforced.data.version), defenderId: "local-rival-drift", sectorNodeId: "rival-drift" };
+    const rivalBattle = await call<{ result: { winner: string }; sectorNodeId?: string }>(running, "/attacks", "POST", rivalRequest);
+    expect(rivalBattle.status).toBe(201);
+    expect(rivalBattle.data.result.winner).toBe("attacker");
+    expect(rivalBattle.data.sectorNodeId).toBe("rival-drift");
+    const rivalSector = await call<{ nodes: Array<{ id: string; status: string }> }>(running, "/profiles/campaign-player/sector");
+    expect(rivalSector.data.nodes.find((node) => node.id === "rival-drift")?.status).toBe("secured");
+  });
+
+  it("rejects rival relay attacks outside a profile's connected frontier", async () => {
+    await createProfile(running, "attacker");
+    await createProfile(running, "local-rival-drift");
+    const attacker = await trainStarterForce(running, "attacker");
+    const snapshot = await call<{ version: number; snapshotHash: string }>(running, "/profiles/local-rival-drift/snapshot");
+    const request = { ...attackRequest(snapshot.data, "attacker", "unconnected-rival", 3, attacker.version), defenderId: "local-rival-drift", sectorNodeId: "rival-drift" };
+    const denied = await call<{ error: string }>(running, "/attacks", "POST", request);
+    expect(denied.status).toBe(409);
+    expect(denied.data.error).toContain("connected frontier");
+    const attackerState = await call<{ version: number; colony: { reports: unknown[] } }>(running, "/profiles/attacker");
+    expect(attackerState.data.version).toBe(attacker.version);
+    expect(attackerState.data.colony.reports).toHaveLength(0);
+  });
 });
