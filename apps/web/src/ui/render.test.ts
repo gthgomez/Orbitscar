@@ -116,4 +116,17 @@ describe("first-session UI and scouting", () => {
     expect(retreatHtml).toContain("Salvage on withdrawal: none");
     expect(retreatHtml).not.toContain("Alloy 36 · Volatile 14 · Signal 6");
   });
+
+  it("requires settling an unarchived report before starting another attack", () => {
+    const fixture = JSON.parse(readFileSync(resolve("fixtures/battle_fixture.json"), "utf8"));
+    const input: OrbitscarBattleInput = parseOrbitscarBattleScenario(fixture, content);
+    const replay = { kind: "attack" as const, input, result: resolveOrbitscarBattle(input), attemptId: "unsettled-report", startedAt: 0, eventIndex: 0, done: true };
+    const pending = render({ colony: createColony("pending-report", content), session: { ...createGameSession(), mode: "report", replay } });
+    expect(pending).toContain('data-action="return-home"');
+    expect(pending).not.toContain('data-action="attack-again"');
+    expect(pending).toContain("Settle this report before planning another attack");
+
+    const archived = render({ colony: createColony("archived-report", content), session: { ...createGameSession(), mode: "report", replay: { ...replay, archived: true } } });
+    expect(archived).toContain('data-action="attack-again"');
+  });
 });

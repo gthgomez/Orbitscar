@@ -424,7 +424,7 @@ export function createOrbitscarServer(options: ServerOptions): Server {
         if (!validation.ok) throw new ApiError(400, validation.errors.join("; "));
         const result = resolveOrbitscarBattle(input);
         const settled = applyBattleResult(state, input, result, idempotencyId, targetId);
-        const response = { profileId: id, version: expectedVersion + 1, attemptId: idempotencyId, targetId, input, result, sector: settled.sector };
+        const response = { profileId: id, version: expectedVersion + 1, colony: settled, attemptId: idempotencyId, targetId, input, result, sector: settled.sector };
         const next = structuredClone(database);
         next.profiles[id] = { version: expectedVersion + 1, save: serializeColony(settled) };
         next.requests[idempotencyId] = { fingerprint, statusCode: 201, response: compressResponse(response), responseEncoding: "deflate-json-v1" };

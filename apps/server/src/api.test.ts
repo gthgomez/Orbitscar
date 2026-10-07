@@ -226,11 +226,14 @@ describe("authoritative asynchronous rival API", () => {
     const scouted = await call<{ version: number }>(running, "/profiles/campaign-player/actions", "POST", { requestId: "campaign-scout", expectedVersion: 2, action: { type: "SCOUT", targetId: "drift-lode" } });
     expect(scouted.status).toBe(200);
     const attack = { requestId: "campaign-drift-1", expectedVersion: 3, targetId: "drift-lode", army: [{ unitId: "line_rigger", count: 10 }], commands: [{ commandId: "opening", sequence: 1, tick: 0, type: "DEPLOY", payload: { zone: "west", position: { x: 120, y: 400 }, units: [{ unitId: "line_rigger", count: 10 }] } }] };
-    const first = await call<{ result: { outcomeHash: string; victoryTier: string; winner: string }; input: Parameters<typeof resolveOrbitscarBattle>[0]; sector: { securedNodeIds: string[] } }>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
+    const first = await call<{ profileId: string; version: number; colony: { reports: Array<{ attemptId: string }> }; result: { outcomeHash: string; victoryTier: string; winner: string }; input: Parameters<typeof resolveOrbitscarBattle>[0]; sector: { securedNodeIds: string[] } }>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
     expect(first.status).toBe(201);
     expect(first.data.result.winner).toBe("attacker");
     expect(resolveOrbitscarBattle(first.data.input).outcomeHash).toBe(first.data.result.outcomeHash);
     expect(first.data.sector.securedNodeIds).toContain("drift-lode");
+    expect(first.data.profileId).toBe("campaign-player");
+    expect(first.data.version).toBe(4);
+    expect(first.data.colony.reports.some((report) => report.attemptId === "campaign-drift-1")).toBe(true);
     type StoredRequest = { response: unknown; responseEncoding?: string };
     const stored = JSON.parse(await readFile(join(directory, "server-state.json"), "utf8")) as { schemaVersion: number; requests: Record<string, StoredRequest> };
     expect(stored.schemaVersion).toBe(2);
@@ -254,6 +257,7 @@ describe("authoritative asynchronous rival API", () => {
     const duplicate = await call<typeof first.data>(running, "/profiles/campaign-player/campaign-attacks", "POST", attack);
     expect(duplicate.status).toBe(200);
     expect(duplicate.data.result.outcomeHash).toBe(first.data.result.outcomeHash);
+    expect(duplicate.data.colony).toEqual(first.data.colony);
     const sector = await call<{ nodes: Array<{ id: string; status: string }> }>(running, "/profiles/campaign-player/sector");
     expect(sector.status).toBe(200);
     expect(sector.data.nodes.find((node) => node.id === "drift-lode")?.status).toBe("secured");

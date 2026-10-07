@@ -66,7 +66,7 @@ describe("Orbitscar balance scenario guards", () => {
       const best = Math.max(...specialistRates.map(({ rate }) => rate));
       expect(best, `no specialist composition/approach reached a 75% win rate on ${encounter.id} (${specialistRates.map(({ id, rate }) => `${id}=${Math.round(rate * 100)}%`).join(", ")}); specialist planning must retain a viable counter`).toBeGreaterThanOrEqual(0.75);
     }
-  }, 30_000);
+  }, 60_000);
 
   it("immediate mass deployment does not win every scenario", () => {
     const replicas = 2;

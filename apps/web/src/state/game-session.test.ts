@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attackAgain, beginArmyComposition, beginDeployment, canStageWave, clearAttackPlan, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, type ReplayState } from "./game-session.js";
+import { attackAgain, beginArmyComposition, beginDeployment, canStageWave, clearAttackPlan, createGameSession, hasPendingSettlement, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, type ReplayState } from "./game-session.js";
 
 describe("playable client session transitions", () => {
   it("clears replay state for attack again, restart, cancel, and a new deployment", () => {
@@ -17,5 +17,14 @@ describe("playable client session transitions", () => {
     expect(MAX_DEPLOYMENT_CHARGES).toBe(3);
     expect(canStageWave(session)).toBe(true);
     expect(canStageWave(threeWaveSession)).toBe(false);
+  });
+
+  it("keeps profile switching locked until an unarchived battle report is settled", () => {
+    const replay = { kind: "attack", input: {} as ReplayState["input"], result: {} as ReplayState["result"], attemptId: "authority-attack", startedAt: 0, eventIndex: 0, done: true } satisfies ReplayState;
+    const report = showReport(startBattle(createGameSession(), replay));
+    expect(report.mode).toBe("report");
+    expect(hasPendingSettlement(report)).toBe(true);
+    expect(hasPendingSettlement({ ...report, replay: { ...replay, archived: true } })).toBe(false);
+    expect(hasPendingSettlement({ ...report, replay: { ...replay, kind: "defense" } })).toBe(true);
   });
 });

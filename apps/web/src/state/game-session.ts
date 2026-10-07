@@ -51,6 +51,10 @@ export function showReport(session: GameSession): GameSession {
   return session.replay?.done ? { ...session, mode: "report" } : session;
 }
 
+export function hasPendingSettlement(session: GameSession): boolean {
+  return session.replay !== undefined && !session.replay.archived;
+}
+
 export function countStaged(waves: readonly Wave[], unitId: string): number {
   return waves.reduce((total, wave) => total + (wave.units.find((entry) => entry.unitId === unitId)?.count ?? 0), 0);
 }

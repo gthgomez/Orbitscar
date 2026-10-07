@@ -4,7 +4,7 @@ import { parseOrbitscarContent, type OrbitscarEncounterDefinition } from "@orbit
 import { appendOrbitscarCommand, applyBattleResult, authoritativeDigest, applyColonyDefenseResult, beginColonySortie, buildColonyRaidInput, COLONY_RAID_ARCHETYPES, colonyRaidIntensity, collectColonyProduction, commandTierOf, placeColonyBuilding, recordColonyScout, repairColonyBuilding, researchDoctrine, resolveOrbitscarBattle, sectorRewardPreview, selectColonyCommander, trainUnits, upgradeColonyBuilding, type ColonyState, type OrbitscarBattleInput } from "@orbitscar/simulation";
 import { OrbitscarScene, ARENA } from "./game/scene.js";
 import { loadColony, persistColony } from "./persistence/colony-save.js";
-import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
+import { attackAgain, beginDeployment, beginArmyComposition, canStageWave, clearAttackPlan, countStaged, createGameSession, hasPendingSettlement, MAX_DEPLOYMENT_CHARGES, restartPlan, showReport, startBattle, zonePositions, type GameSession, type Zone } from "./state/game-session.js";
 import { renderApp } from "./ui/render.js";
 import { createSoundPlayer } from "./audio.js";
 import { AuthorityApiError, createAuthorityClient, deriveAuthorityAttackSeed, deriveAuthorityCampaignSeed, type AuthorityAction, type AuthorityProfile, type AuthoritySector, type AuthoritySnapshot } from "./authority/api-client.js";
@@ -420,7 +420,7 @@ function handleAction(action: string): void {
   const [verb, value, unitId] = action.split(":");
   if (action === "authority-panel") { authorityPanelOpen = !authorityPanelOpen; refresh(); return; }
   if (action === "authority-load" || action === "authority-create") {
-    if (session.mode === "battle" || authorityBusy) { setNotice("Finish the current battle before changing authority profiles."); return; }
+    if (hasPendingSettlement(session) || authorityBusy) { setNotice("Settle or archive the current battle report before changing authority profiles."); return; }
     const profileId = root.querySelector<HTMLInputElement>("#authority-profile-id")?.value.trim().toLowerCase();
     if (!profileId || !/^[a-z0-9][a-z0-9-]{1,31}$/.test(profileId)) { setNotice("Profile IDs use 2–32 lowercase letters, numbers, or hyphens."); return; }
     authorityBusy = true;
@@ -430,11 +430,14 @@ function handleAction(action: string): void {
     return;
   }
   if (action === "authority-local") {
-    if (session.mode === "battle" || authorityBusy) { setNotice("Finish the current battle before changing authority profiles."); return; }
+    if (hasPendingSettlement(session) || authorityBusy) { setNotice("Settle or archive the current battle report before changing authority profiles."); return; }
     authorityProfileId = undefined; authorityVersion = undefined; authoritySector = undefined;
     authorityRivalSnapshot = undefined; authorityRivalProfileId = undefined; authorityRivalNodeId = undefined;
     try { localStorage.removeItem(authorityProfileKey); } catch { /* local saves remain available */ }
     colony = loadColony(content); authorityPanelOpen = false; notice = "Returned to the separate solo save."; refresh(); return;
+  }
+  if (hasPendingSettlement(session) && ["colony", "targets", "army", "attack-again"].includes(action)) {
+    setNotice("Settle the current report before changing plans. The return action applies its result exactly once."); return;
   }
   if (action === "colony") { session = clearAttackPlan(session); setMode("colony"); return; }
   if (action === "targets") { session = clearAttackPlan(session); setMode("targets"); return; }
