@@ -22,11 +22,11 @@ describe("Orbitscar progression content", () => {
     expect(new Set(encounters.map((encounter) => encounter.difficulty)).size).toBe(3);
   });
 
-  it("keeps the expanded encounter footprints inside the arena and separated", () => {
+  it("keeps every authored encounter footprint inside the arena and separated", () => {
     const content = parseOrbitscarContent(source);
-    const expandedIds = ["drift-lode", "glasswake-gate", "ember-switch", "salt-spool", "shard-cairn", "morrow-gate", "vesper-vault", "hollow-meridian"];
-    for (const id of expandedIds) {
-      const structures = content.encounters[id].structures;
+    for (const encounter of Object.values(content.encounters)) {
+      const id = encounter.id;
+      const structures = encounter.structures;
       for (const structure of structures) {
         const [width, height] = content.buildings[structure.buildingId].footprint;
         expect(structure.position.x).toBeGreaterThanOrEqual(0);
@@ -47,6 +47,22 @@ describe("Orbitscar progression content", () => {
         }
       }
     }
+  });
+
+  it("keeps directional structure labels and scout text consistent with mirrored layouts", () => {
+    const content = parseOrbitscarContent(source);
+    for (const encounter of Object.values(content.encounters)) {
+      for (const structure of encounter.structures) {
+        const centerY = structure.position.y + content.buildings[structure.buildingId].footprint[1] * 20;
+        if (structure.id.startsWith("upper-")) expect(centerY, `${encounter.id}/${structure.id} should be north of the arena midline`).toBeLessThan(400);
+        if (structure.id.startsWith("lower-")) expect(centerY, `${encounter.id}/${structure.id} should be south of the arena midline`).toBeGreaterThan(400);
+      }
+    }
+    for (const id of ["glass-spine", "glasswake-gate", "salt-spool", "morrow-gate", "hollow-meridian"]) {
+      expect(content.encounters[id].description, `${id} orientation-neutral scout text`).not.toMatch(/\b(upper|lower|north|south)\b/i);
+    }
+    expect(content.encounters["hollow-meridian"].description).toMatch(/one long-range projector/i);
+    expect(content.encounters["hollow-meridian"].description).toMatch(/two scatter coils/i);
   });
 
   it("rejects impossible player tiers and NPC structures above their declared tier", () => {

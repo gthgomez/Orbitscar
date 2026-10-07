@@ -60,17 +60,43 @@ describe("Orbitscar balance scenario acceptance gates", () => {
     expect(casualties, `line-rigger screen won ${attackerWins(records)}/${records.length} scenarios while taking ${casualties} casualties; a cost-free sweep is degenerate regardless of win rate`).toBeGreaterThan(0);
   });
 
-  it("immediate mass deployment is not strictly dominant on any armed encounter", () => {
+  it("every defended encounter resists a universal all-in plan", () => {
     const replicas = 2;
     for (const encounter of armedEncounters) {
       const records: RunRecord[] = [];
       for (const composition of compositions)
-        for (let replica = 0; replica < replicas; replica += 1)
-          records.push(scenario(encounter.id, composition.id, "immediate-mass", "west", false, compositionSeed(TIMING_SEED_BASE, replica)));
+        for (const zone of ["west", "north", "south", "east"] as const)
+          for (let replica = 0; replica < replicas; replica += 1)
+            records.push(scenario(encounter.id, composition.id, "immediate-mass", zone, false, compositionSeed(TIMING_SEED_BASE, replica)));
       const wins = attackerWins(records);
-      expect(wins, `immediate mass deployment won ${wins}/${records.length} on armed encounter ${encounter.id}; every combat encounter must give staged or zone play a real opening`).toBeLessThan(records.length);
+      expect(wins, `every immediate composition cleared ${encounter.id} from every approach in both seeds (${wins}/${records.length}); the encounter needs a real counterpressure matchup`).toBeLessThan(records.length);
     }
-  });
+  }, 30_000);
+
+  it("approach value varies by relay without a global side dominating", () => {
+    const replicas = 2;
+    const zones = ["west", "north", "south", "east"] as const;
+    const ratesByZone = new Map<(typeof zones)[number], number[]>();
+    for (const zone of zones) ratesByZone.set(zone, []);
+    let targetBestCounts = Object.fromEntries(zones.map((zone) => [zone, 0])) as Record<(typeof zones)[number], number>;
+
+    for (const encounter of armedEncounters) {
+      const targetRates = Object.fromEntries(zones.map((zone) => {
+        const records = compositions.flatMap((composition) => Array.from({ length: replicas }, (_, replica) => scenario(encounter.id, composition.id, "immediate-mass", zone, false, compositionSeed(TIMING_SEED_BASE, replica))));
+        const rate = winRate(records);
+        ratesByZone.get(zone)!.push(...records.map((record) => Number(record.winner === "attacker")));
+        return [zone, rate];
+      })) as Record<(typeof zones)[number], number>;
+      const bestRate = Math.max(...Object.values(targetRates));
+      for (const zone of zones) if (targetRates[zone] === bestRate) targetBestCounts[zone] += 1;
+    }
+
+    const globalRates = Object.fromEntries(zones.map((zone) => [zone, ratesByZone.get(zone)!.reduce((sum, win) => sum + win, 0) / ratesByZone.get(zone)!.length])) as Record<(typeof zones)[number], number>;
+    const gap = Math.max(...Object.values(globalRates)) - Math.min(...Object.values(globalRates));
+    expect(Object.values(targetBestCounts).every((count) => count > 0), `every approach should be a best or tied-best choice on at least one defended relay; observed ${JSON.stringify(targetBestCounts)}`).toBe(true);
+    expect(Math.max(...Object.values(targetBestCounts)), `no approach should be best on most defended relays; observed ${JSON.stringify(targetBestCounts)}`).toBeLessThanOrEqual(6);
+    expect(gap, `global approach win-rate gap should remain within 15 points; observed ${JSON.stringify(globalRates)}`).toBeLessThanOrEqual(0.15);
+  }, 30_000);
 
   it("commander ability materially changes battle outcomes", () => {
     const replicas = 2;

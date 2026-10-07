@@ -142,7 +142,39 @@ Identical seeds reproduce these results byte-for-byte (deterministic resolver).
 
 ## Historical ruleset 0.2.0 snapshot — superseded
 
-These campaign answers describe the early baseline and are retained for context. Current balance evidence is the ruleset 0.5.0 evaluation above and the campaign status file.
+These campaign answers describe the early baseline and are retained for context. Current balance evidence is the ruleset 0.7.0 evaluation below and the campaign status file.
+
+## Approach geography and footprint cleanup — ruleset 0.7.0
+
+Five defended layouts were mirrored across the arena’s horizontal midline and
+five across its vertical midline, with top-left coordinates transformed using
+each structure’s actual footprint. This gives the campaign hostile bases on
+both sides of the map and swaps north/south and west/east route opportunities
+without changing weapon or unit values. The undefended Drift Lode stays
+unchanged. Scout descriptions and directional structure labels were reconciled
+with the new positions.
+
+The all-encounter footprint check exposed and fixed two older overlaps in Glass
+Spine and Quiet Orbit. Every authored structure now remains inside the arena
+and no structure footprints overlap.
+
+The 4,928-run corpus (2,464 plans × 2 seeds) completed with zero invariant
+violations and 4,400 unique outcome hashes. Aggregate approach win rates were
+west 60.7%, north 58.9%, south 65.6%, east 65.9%, narrowing the global spread
+to 7.0 points from about 19 points before the layout iteration. In the
+two-seed immediate-mass approach gate, west/north/south/east won 56.4%/63.6%/
+69.3%/69.3%; each approach was best or tied-best on at least two defended
+relays, and no approach was best on more than five of ten. Cinder Yard’s
+command relay now sits on the western side; its opening still rewards scouting
+route shape before committing to a lane.
+
+Composition win rates were screen-line 74.7%, ranged-fortress 68.5%,
+anti-armor-punch 74.3%, air-harass 84.2%, skirmish-mix 50.9%, salvage-raid
+34.8%, and sabotage-strike 52.1%. Timing remains tilted toward immediate
+deployment: immediate-mass 76.6%, probe-reinforce 66.7%, half-half 58.4%, and
+three waves 49.4%. This iteration improves map-side choice without solving
+composition or timing balance. Deterministic corpus results are not human fun
+or readability evidence.
 
 **Multiple viable approaches — YES.** Against the introductory target
 (cinder-yard), at least three archetypes win reliably: screen-line (100%),

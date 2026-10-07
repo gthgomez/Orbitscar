@@ -1,6 +1,6 @@
 {
   "canonicalFormatVersion": 2,
-  "rulesetVersion": "0.6.0",
+  "rulesetVersion": "0.7.0",
   "seed": 17,
   "maxDurationTicks": 2400,
   "arena": { "width": 1200, "height": 800 },

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contentSet": "orbitscar-v0",
-  "rulesetVersion": "0.6.0",
+  "rulesetVersion": "0.7.0",
   "resources": {
     "alloy": {
       "kind": "normal"
@@ -608,7 +608,7 @@
           "id": "relay",
           "buildingId": "command_relay",
           "position": {
-            "x": 930,
+            "x": 150,
             "y": 400
           }
         },
@@ -616,7 +616,7 @@
           "id": "extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 760,
+            "x": 360,
             "y": 240
           }
         },
@@ -624,7 +624,7 @@
           "id": "cradle",
           "buildingId": "drop_cradle",
           "position": {
-            "x": 760,
+            "x": 360,
             "y": 560
           }
         },
@@ -632,7 +632,7 @@
           "id": "arc",
           "buildingId": "arc_projector",
           "position": {
-            "x": 640,
+            "x": 480,
             "y": 300
           }
         },
@@ -640,7 +640,7 @@
           "id": "scatter",
           "buildingId": "scatter_coil",
           "position": {
-            "x": 690,
+            "x": 470,
             "y": 520
           }
         }
@@ -652,7 +652,7 @@
       "name": "Glass Spine Foundry",
       "codename": "GLASS-22",
       "difficulty": "contested",
-      "description": "A compact foundry ring with overlapping fire lanes. The north approach is shorter; the south route gives ranged units more breathing room.",
+      "description": "A compact foundry ring places its resource stores behind two intersecting defense arcs. Scout the lanes to choose how much firing range to trade for a shorter route.",
       "rewardPreview": {
         "alloy": 54,
         "volatile": 20,
@@ -664,7 +664,7 @@
           "buildingId": "command_relay",
           "position": {
             "x": 920,
-            "y": 400
+            "y": 280
           }
         },
         {
@@ -672,7 +672,7 @@
           "buildingId": "matter_extractor",
           "position": {
             "x": 760,
-            "y": 205
+            "y": 515
           }
         },
         {
@@ -680,7 +680,7 @@
           "buildingId": "matter_extractor",
           "position": {
             "x": 760,
-            "y": 595
+            "y": 125
           }
         },
         {
@@ -688,7 +688,7 @@
           "buildingId": "arc_projector",
           "position": {
             "x": 620,
-            "y": 280
+            "y": 440
           }
         },
         {
@@ -696,15 +696,15 @@
           "buildingId": "scatter_coil",
           "position": {
             "x": 710,
-            "y": 470
+            "y": 290
           }
         },
         {
           "id": "scatter-2",
           "buildingId": "scatter_coil",
           "position": {
-            "x": 690,
-            "y": 330
+            "x": 740,
+            "y": 430
           }
         },
         {
@@ -712,7 +712,7 @@
           "buildingId": "snare_lattice",
           "position": {
             "x": 825,
-            "y": 400
+            "y": 360
           }
         }
       ]
@@ -734,7 +734,7 @@
           "id": "relay",
           "buildingId": "command_relay",
           "position": {
-            "x": 930,
+            "x": 150,
             "y": 400
           }
         },
@@ -742,7 +742,7 @@
           "id": "extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 760,
+            "x": 360,
             "y": 210
           }
         },
@@ -750,7 +750,7 @@
           "id": "extractor-2",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 760,
+            "x": 360,
             "y": 590
           }
         },
@@ -758,7 +758,7 @@
           "id": "cradle",
           "buildingId": "drop_cradle",
           "position": {
-            "x": 790,
+            "x": 410,
             "y": 400
           }
         },
@@ -766,7 +766,7 @@
           "id": "arc",
           "buildingId": "arc_projector",
           "position": {
-            "x": 610,
+            "x": 510,
             "y": 260
           }
         },
@@ -774,7 +774,7 @@
           "id": "scatter",
           "buildingId": "scatter_coil",
           "position": {
-            "x": 675,
+            "x": 485,
             "y": 500
           }
         },
@@ -782,7 +782,7 @@
           "id": "snare",
           "buildingId": "snare_lattice",
           "position": {
-            "x": 835,
+            "x": 285,
             "y": 400
           }
         }
@@ -841,7 +841,7 @@
       "name": "Glasswake Gate",
       "codename": "WAKE-11",
       "difficulty": "contested",
-      "description": "A projector guards the upper lane while a scatter coil and air snare cover the lower service ring. The south route avoids the gun line but exposes the coil early.",
+      "description": "The projector controls the middle approach while a scatter coil and air snare guard the relay-side lanes. Scout their firing arcs and choose an entry that exposes the force to one weapon at a time.",
       "rewardPreview": {
         "alloy": 38,
         "volatile": 16,
@@ -853,7 +853,7 @@
           "buildingId": "command_relay",
           "position": {
             "x": 900,
-            "y": 360
+            "y": 320
           }
         },
         {
@@ -861,7 +861,7 @@
           "buildingId": "matter_extractor",
           "position": {
             "x": 780,
-            "y": 200
+            "y": 520
           }
         },
         {
@@ -869,7 +869,7 @@
           "buildingId": "drop_cradle",
           "position": {
             "x": 760,
-            "y": 600
+            "y": 120
           }
         },
         {
@@ -877,7 +877,7 @@
           "buildingId": "arc_projector",
           "position": {
             "x": 620,
-            "y": 320
+            "y": 400
           }
         },
         {
@@ -885,7 +885,7 @@
           "buildingId": "scatter_coil",
           "position": {
             "x": 700,
-            "y": 500
+            "y": 260
           }
         },
         {
@@ -893,7 +893,7 @@
           "buildingId": "snare_lattice",
           "position": {
             "x": 820,
-            "y": 420
+            "y": 340
           }
         }
       ]
@@ -915,7 +915,7 @@
           "id": "relay",
           "buildingId": "command_relay",
           "position": {
-            "x": 900,
+            "x": 180,
             "y": 360
           }
         },
@@ -923,7 +923,7 @@
           "id": "extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 800,
+            "x": 320,
             "y": 200
           }
         },
@@ -931,7 +931,7 @@
           "id": "cradle",
           "buildingId": "drop_cradle",
           "position": {
-            "x": 800,
+            "x": 320,
             "y": 600
           }
         },
@@ -939,7 +939,7 @@
           "id": "projector",
           "buildingId": "arc_projector",
           "position": {
-            "x": 620,
+            "x": 500,
             "y": 320
           }
         },
@@ -947,7 +947,7 @@
           "id": "coil",
           "buildingId": "scatter_coil",
           "position": {
-            "x": 650,
+            "x": 510,
             "y": 500
           }
         }
@@ -971,7 +971,7 @@
           "buildingId": "command_relay",
           "position": {
             "x": 900,
-            "y": 360
+            "y": 320
           }
         },
         {
@@ -979,11 +979,11 @@
           "buildingId": "matter_extractor",
           "position": {
             "x": 780,
-            "y": 200
+            "y": 520
           }
         },
         {
-          "id": "upper-cradle",
+          "id": "cradle-a",
           "buildingId": "drop_cradle",
           "position": {
             "x": 560,
@@ -991,11 +991,11 @@
           }
         },
         {
-          "id": "lower-cradle",
+          "id": "cradle-b",
           "buildingId": "drop_cradle",
           "position": {
             "x": 760,
-            "y": 600
+            "y": 120
           }
         },
         {
@@ -1003,7 +1003,7 @@
           "buildingId": "snare_lattice",
           "position": {
             "x": 820,
-            "y": 420
+            "y": 340
           }
         },
         {
@@ -1011,7 +1011,7 @@
           "buildingId": "scatter_coil",
           "position": {
             "x": 700,
-            "y": 520
+            "y": 240
           }
         }
       ]
@@ -1033,7 +1033,7 @@
           "id": "relay",
           "buildingId": "command_relay",
           "position": {
-            "x": 900,
+            "x": 180,
             "y": 360
           }
         },
@@ -1041,7 +1041,7 @@
           "id": "upper-extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 780,
+            "x": 340,
             "y": 200
           }
         },
@@ -1049,7 +1049,7 @@
           "id": "lower-extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 780,
+            "x": 340,
             "y": 600
           }
         },
@@ -1057,15 +1057,15 @@
           "id": "projector",
           "buildingId": "arc_projector",
           "position": {
-            "x": 600,
+            "x": 520,
             "y": 280
           }
         },
         {
-          "id": "upper-projector",
+          "id": "projector-a",
           "buildingId": "arc_projector",
           "position": {
-            "x": 700,
+            "x": 420,
             "y": 360
           }
         },
@@ -1073,7 +1073,7 @@
           "id": "coil",
           "buildingId": "scatter_coil",
           "position": {
-            "x": 620,
+            "x": 540,
             "y": 500
           }
         },
@@ -1081,7 +1081,7 @@
           "id": "snare",
           "buildingId": "snare_lattice",
           "position": {
-            "x": 800,
+            "x": 320,
             "y": 400
           }
         }
@@ -1093,7 +1093,7 @@
       "name": "Morrow Gate Array",
       "codename": "MORROW-27",
       "difficulty": "severe",
-      "description": "Two projectors divide the upper and lower lanes while a lattice screens the central approach. A single front-loaded drop can be punished; staging a counter force can open the second lane.",
+      "description": "Two projectors cover opposing lanes around a central air lattice. A front-loaded force can draw both weapons; hold a reserve to enter after the defenders commit to one side.",
       "rewardPreview": {
         "alloy": 66,
         "volatile": 26,
@@ -1105,7 +1105,7 @@
           "buildingId": "command_relay",
           "position": {
             "x": 900,
-            "y": 400
+            "y": 280
           }
         },
         {
@@ -1113,7 +1113,7 @@
           "buildingId": "matter_extractor",
           "position": {
             "x": 820,
-            "y": 200
+            "y": 520
           }
         },
         {
@@ -1121,23 +1121,23 @@
           "buildingId": "drop_cradle",
           "position": {
             "x": 820,
-            "y": 600
+            "y": 120
           }
         },
         {
-          "id": "upper-projector",
+          "id": "projector-a",
           "buildingId": "arc_projector",
           "position": {
             "x": 680,
-            "y": 260
+            "y": 460
           }
         },
         {
-          "id": "lower-projector",
+          "id": "projector-b",
           "buildingId": "arc_projector",
           "position": {
             "x": 680,
-            "y": 500
+            "y": 220
           }
         },
         {
@@ -1145,7 +1145,7 @@
           "buildingId": "snare_lattice",
           "position": {
             "x": 820,
-            "y": 420
+            "y": 340
           }
         }
       ]
@@ -1167,7 +1167,7 @@
           "id": "relay",
           "buildingId": "command_relay",
           "position": {
-            "x": 900,
+            "x": 180,
             "y": 380
           }
         },
@@ -1175,7 +1175,7 @@
           "id": "upper-extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 840,
+            "x": 280,
             "y": 200
           }
         },
@@ -1183,7 +1183,7 @@
           "id": "lower-extractor",
           "buildingId": "matter_extractor",
           "position": {
-            "x": 840,
+            "x": 280,
             "y": 600
           }
         },
@@ -1191,7 +1191,7 @@
           "id": "projector",
           "buildingId": "arc_projector",
           "position": {
-            "x": 680,
+            "x": 440,
             "y": 260
           }
         },
@@ -1199,7 +1199,7 @@
           "id": "coil",
           "buildingId": "scatter_coil",
           "position": {
-            "x": 700,
+            "x": 460,
             "y": 480
           }
         },
@@ -1207,7 +1207,7 @@
           "id": "snare",
           "buildingId": "snare_lattice",
           "position": {
-            "x": 800,
+            "x": 320,
             "y": 400
           }
         },
@@ -1215,7 +1215,7 @@
           "id": "cradle",
           "buildingId": "drop_cradle",
           "position": {
-            "x": 720,
+            "x": 400,
             "y": 400
           }
         }
@@ -1227,7 +1227,7 @@
       "name": "Hollow Meridian Bastion",
       "codename": "HOLLOW-39",
       "difficulty": "severe",
-      "description": "A fortified relay stacks two projector lanes with layered coils and an air snare. The central cradle breaks the straight route; scouting for the open side matters more than raw force.",
+      "description": "One long-range projector and two scatter coils form a layered defense around an air snare. A central cradle breaks the straight route; scout ranges and target priorities before committing to a lane.",
       "rewardPreview": {
         "alloy": 84,
         "volatile": 34,
@@ -1239,47 +1239,47 @@
           "buildingId": "command_relay",
           "position": {
             "x": 900,
-            "y": 360
+            "y": 320
           }
         },
         {
-          "id": "upper-extractor",
+          "id": "extractor-a",
           "buildingId": "matter_extractor",
           "position": {
             "x": 840,
-            "y": 220
+            "y": 500
           }
         },
         {
-          "id": "lower-extractor",
+          "id": "extractor-b",
           "buildingId": "matter_extractor",
           "position": {
             "x": 840,
-            "y": 580
+            "y": 140
           }
         },
         {
-          "id": "upper-projector",
+          "id": "projector-a",
           "buildingId": "arc_projector",
           "position": {
             "x": 650,
-            "y": 200
+            "y": 520
           }
         },
         {
-          "id": "upper-coil",
+          "id": "coil-a",
           "buildingId": "scatter_coil",
           "position": {
             "x": 690,
-            "y": 360
+            "y": 400
           }
         },
         {
-          "id": "lower-coil",
+          "id": "coil-b",
           "buildingId": "scatter_coil",
           "position": {
             "x": 690,
-            "y": 440
+            "y": 320
           }
         },
         {
@@ -1287,7 +1287,7 @@
           "buildingId": "snare_lattice",
           "position": {
             "x": 800,
-            "y": 360
+            "y": 400
           }
         },
         {
