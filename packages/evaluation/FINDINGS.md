@@ -140,7 +140,9 @@ pnpm evaluate --runs 1344 --seed-base 10000 --out runs/eval-2026-09-05
 
 Identical seeds reproduce these results byte-for-byte (deterministic resolver).
 
-## Answers to the campaign questions
+## Historical ruleset 0.2.0 snapshot — superseded
+
+These campaign answers describe the early baseline and are retained for context. Current balance evidence is the ruleset 0.5.0 evaluation above and the campaign status file.
 
 **Multiple viable approaches — YES.** Against the introductory target
 (cinder-yard), at least three archetypes win reliably: screen-line (100%),

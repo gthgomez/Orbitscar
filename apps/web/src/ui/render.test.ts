@@ -46,7 +46,9 @@ describe("first-session UI and scouting", () => {
 
     const scouted = recordColonyScout(colony, "cinder-yard", content);
     const revealed = render({ colony: scouted, session });
-    expect(revealed).toContain("Suggested units:");
+    expect(revealed).not.toContain("Suggested units:");
+    expect(revealed).toContain("Known unit vulnerabilities:");
+    expect(revealed).toContain("Line Rigger → Scatter Coil");
     expect(revealed).toContain("scatter (190 range)");
     expect(revealed).toContain('data-action="army"');
     expect(revealed).not.toContain('data-action="army" disabled');

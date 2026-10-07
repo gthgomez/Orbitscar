@@ -3,7 +3,6 @@ import type { OrbitscarBattleResult } from "@orbitscar/simulation";
 
 export type BattleReportAnalysis = {
   recordedFacts: string[];
-  tacticalSuggestion?: string;
 };
 
 type ReportKind = "attack" | "defense";
@@ -94,8 +93,7 @@ export function analyzeBattleReport(
       facts.push(`${casualties} attacker casualties were recorded; ${returned} deployed units returned and ${reserves} remained in reserve.`);
     }
 
-    const suggestions = target.suggestedCounters.map((id) => friendlyName(id));
-    return { recordedFacts: facts, tacticalSuggestion: suggestions.length ? `Intel suggests considering ${suggestions.join(", ")} for this defense profile.` : undefined };
+    return { recordedFacts: facts };
   }
 
   const topDefense = topByAmount(defenseDamage);

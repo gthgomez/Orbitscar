@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contentSet": "orbitscar-v0",
-  "rulesetVersion": "0.5.0",
+  "rulesetVersion": "0.6.0",
   "resources": {
     "alloy": {
       "kind": "normal"
@@ -603,11 +603,6 @@
         "volatile": 14,
         "signal": 6
       },
-      "suggestedCounters": [
-        "line_rigger",
-        "pulse_marksman",
-        "ram_walker"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -663,11 +658,6 @@
         "volatile": 20,
         "signal": 10
       },
-      "suggestedCounters": [
-        "pulse_marksman",
-        "signal_saboteur",
-        "needle_drone"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -739,11 +729,6 @@
         "volatile": 28,
         "signal": 15
       },
-      "suggestedCounters": [
-        "shield_carrier",
-        "breach_medic",
-        "ram_walker"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -815,10 +800,6 @@
         "volatile": 12,
         "signal": 7
       },
-      "suggestedCounters": [
-        "salvage_hauler",
-        "skirmish_walker"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -866,11 +847,6 @@
         "volatile": 16,
         "signal": 8
       },
-      "suggestedCounters": [
-        "pulse_marksman",
-        "skirmish_walker",
-        "shield_carrier"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -934,11 +910,6 @@
         "volatile": 19,
         "signal": 10
       },
-      "suggestedCounters": [
-        "pulse_marksman",
-        "shield_carrier",
-        "signal_saboteur"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -994,11 +965,6 @@
         "volatile": 21,
         "signal": 11
       },
-      "suggestedCounters": [
-        "signal_saboteur",
-        "ram_walker",
-        "breach_medic"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -1062,11 +1028,6 @@
         "volatile": 24,
         "signal": 12
       },
-      "suggestedCounters": [
-        "pulse_marksman",
-        "signal_saboteur",
-        "ram_walker"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -1138,11 +1099,6 @@
         "volatile": 26,
         "signal": 13
       },
-      "suggestedCounters": [
-        "shield_carrier",
-        "breach_medic",
-        "signal_saboteur"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -1206,11 +1162,6 @@
         "volatile": 31,
         "signal": 17
       },
-      "suggestedCounters": [
-        "shield_carrier",
-        "ram_walker",
-        "breach_medic"
-      ],
       "structures": [
         {
           "id": "relay",
@@ -1282,11 +1233,6 @@
         "volatile": 34,
         "signal": 19
       },
-      "suggestedCounters": [
-        "signal_saboteur",
-        "shield_carrier",
-        "ram_walker"
-      ],
       "structures": [
         {
           "id": "relay",

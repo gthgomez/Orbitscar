@@ -51,7 +51,6 @@ describe("battle report analysis", () => {
     expect(report.recordedFacts.join(" ")).toContain("Line Rigger dealt 15 recorded structure damage");
     expect(report.recordedFacts.join(" ")).toContain("Reinforcement 1 dealt 0 recorded damage");
     expect(report.recordedFacts.join(" ")).toContain("Emergency Reroute was activated at tick 35, focused on Arc Projector");
-    expect(report.tacticalSuggestion).toContain("Intel suggests");
   });
 
   it("reports defensive damage and attacker pressure without reversing damage attribution", () => {

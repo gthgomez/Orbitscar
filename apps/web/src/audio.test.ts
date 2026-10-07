@@ -26,4 +26,12 @@ describe("procedural sound cues", () => {
     expect(oscillator.stop).toHaveBeenCalledOnce();
     expect(gain.gain.exponentialRampToValueAtTime).toHaveBeenCalledOnce();
   });
+
+  it("does not let a routine impact suppress a battle outcome cue", () => {
+    const { context } = audioContext();
+    const play = createSoundPlayer(() => context as unknown as AudioContext);
+    play("impact", false);
+    play("victory", false);
+    expect(context.createOscillator).toHaveBeenCalledTimes(2);
+  });
 });

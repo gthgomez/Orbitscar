@@ -18,7 +18,8 @@ export function createSoundPlayer(createContext: () => AudioContext = () => new 
       context ??= createContext();
       if (context.state === "suspended") void context.resume();
       const now = context.currentTime;
-      if (now - lastPlayedAt < 0.055) return;
+      const priority = cue === "ability" || cue === "victory" || cue === "defeat";
+      if (!priority && now - lastPlayedAt < 0.055) return;
       lastPlayedAt = now;
       const profile = CUES[cue];
       const oscillator = context.createOscillator();

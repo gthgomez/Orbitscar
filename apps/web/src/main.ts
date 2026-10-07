@@ -51,7 +51,7 @@ function restoreActiveBattle(): void {
     if (input.rulesetVersion !== content.rulesetVersion) throw new Error("active battle ruleset is no longer available");
     const result = resolveOrbitscarBattle(input);
     const currentTick = Math.min(input.maxDurationTicks, parsed.currentTick!);
-    selectedTarget = content.encounters[parsed.targetId] ?? { id: parsed.targetId, requiredTier: 1, opponentTier: 1, name: parsed.kind === "defense" ? "Home Colony" : "Archived Target", codename: parsed.targetId.toUpperCase(), difficulty: "contested", description: "Recovered deterministic battle snapshot.", rewardPreview: input.rewardPreview, structures: input.structures, suggestedCounters: [] };
+    selectedTarget = content.encounters[parsed.targetId] ?? { id: parsed.targetId, requiredTier: 1, opponentTier: 1, name: parsed.kind === "defense" ? "Home Colony" : "Archived Target", codename: parsed.targetId.toUpperCase(), difficulty: "contested", description: "Recovered deterministic battle snapshot.", rewardPreview: input.rewardPreview, structures: input.structures };
     const army = Object.fromEntries(input.army.map((entry) => [entry.unitId, entry.count]));
     const waves = input.commands.filter((command) => command.type === "DEPLOY").map((command) => ({ zone: command.payload.zone, units: command.payload.units }));
     const staged = Object.fromEntries(Object.keys(army).map((unitId) => [unitId, waves.reduce((sum, wave) => sum + (wave.units.find((entry) => entry.unitId === unitId)?.count ?? 0), 0)]));
@@ -168,7 +168,7 @@ function startColonyRaid(): void {
     const result = resolveOrbitscarBattle(input);
     colony = applyColonyDefenseResult(colony, input, result, `raid-${seed}`);
     persistColony(colony, "Raid result recorded.");
-    selectedTarget = { id: "home-colony", requiredTier: 1, opponentTier: 1, name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures, suggestedCounters: [] };
+    selectedTarget = { id: "home-colony", requiredTier: 1, opponentTier: 1, name: "Home Colony", codename: `RAID-${String(raidCount + 1).padStart(2, "0")}`, difficulty: raidCount < 2 ? "cautious" : "contested", description: `Hostile ${displayName(archetype)} pressure on your installed layout.`, rewardPreview: {}, structures: input.structures };
     session = startBattle(session, { kind: "defense", input, result, attemptId: `raid-${seed}`, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0 });
     persistActiveBattle();
     lastUiReplayTick = -1;
@@ -237,7 +237,7 @@ function handleAction(action: string): void {
     const report = colony.reports.find((entry) => entry.attemptId === value);
     if (!report?.input) { setNotice("This legacy report has no saved replay snapshot."); return; }
     const reportedEncounter = report.sectorNodeId ? content.encounters[report.sectorNodeId] : undefined;
-    selectedTarget = report.kind === "defense" ? { id: "home-colony", requiredTier: 1, opponentTier: 1, name: "Home Colony", codename: "DEFENSE-LOG", difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures, suggestedCounters: [] } : reportedEncounter ?? { id: selectedTarget.id, requiredTier: 1, opponentTier: 1, name: selectedTarget.name, codename: selectedTarget.codename, difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures, suggestedCounters: [] };
+    selectedTarget = report.kind === "defense" ? { id: "home-colony", requiredTier: 1, opponentTier: 1, name: "Home Colony", codename: "DEFENSE-LOG", difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures } : reportedEncounter ?? { id: selectedTarget.id, requiredTier: 1, opponentTier: 1, name: selectedTarget.name, codename: selectedTarget.codename, difficulty: "contested", description: "Archived deterministic battle snapshot.", rewardPreview: report.input.rewardPreview, structures: report.input.structures };
     clearActiveBattle();
     session = startBattle(session, { kind: report.kind, input: report.input, result: report.result, attemptId: report.attemptId, startedAt: performance.now(), eventIndex: 0, done: false, currentTick: 0, archived: true });
     lastUiReplayTick = -1;

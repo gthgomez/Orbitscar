@@ -97,7 +97,6 @@ export type OrbitscarEncounterDefinition = {
   description: string;
   rewardPreview: OrbitscarResourceBundle;
   structures: Array<{ id: string; buildingId: string; position: { x: number; y: number }; level?: number; currentHealth?: number }>;
-  suggestedCounters: string[];
 };
 
 export type OrbitscarContent = {
@@ -323,7 +322,7 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       const opponentTier = integerValue(item.opponentTier ?? requiredTier, `encounters.${id}.opponentTier`, 1);
       if (opponentTier > 3) throw new Error(`encounters.${id}.opponentTier must be <= 3`);
       if (structures.some((structure) => buildings[structure.buildingId].requiredTier > opponentTier)) throw new Error(`encounters.${id} contains a structure above opponentTier`);
-      return { id, requiredTier, opponentTier, name: stringValue(item.name, `encounters.${id}.name`), codename: stringValue(item.codename, `encounters.${id}.codename`), difficulty: difficulty as OrbitscarEncounterDefinition["difficulty"], description: stringValue(item.description, `encounters.${id}.description`), rewardPreview: resourceBundle(item.rewardPreview, `encounters.${id}.rewardPreview`), structures, suggestedCounters: stringArray(item.suggestedCounters, `encounters.${id}.suggestedCounters`) };
+      return { id, requiredTier, opponentTier, name: stringValue(item.name, `encounters.${id}.name`), codename: stringValue(item.codename, `encounters.${id}.codename`), difficulty: difficulty as OrbitscarEncounterDefinition["difficulty"], description: stringValue(item.description, `encounters.${id}.description`), rewardPreview: resourceBundle(item.rewardPreview, `encounters.${id}.rewardPreview`), structures };
     }),
     "encounters",
   );
