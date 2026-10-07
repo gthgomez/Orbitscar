@@ -1,6 +1,6 @@
 # Project Orbitscar — Vertical Slice
 
-**Status:** LOCAL PLAYABLE SLICE V0.3 — simulation regression coverage, client state seams, and an automated Playwright browser contract suite in place; human blind-test gates remain open.
+**Status:** HISTORICAL LOCAL PLAYABLE SLICE V0.3 — this document records the earlier narrow-slice scope and is superseded by `docs/campaign/full-game/PLAN.md` for current game requirements. Human blind-test gates remain open.
 
 ## Slice question
 

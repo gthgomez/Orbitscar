@@ -1,6 +1,6 @@
 # Project Orbitscar — Master Roadmap
 
-**Status:** ROADMAP V0.2 — remediation and visual-slice continuation recorded; no multiplayer or commerce work authorized yet.
+**Status:** HISTORICAL ROADMAP V0.2 — original sequencing record, superseded by `docs/campaign/full-game/PLAN.md` for current implementation authority. The active campaign explicitly includes a local asynchronous rival API and relay territory; commerce remains deferred.
 
 | Phase | Goal | Deliverables | Dependencies | Acceptance | Kill/pivot |
 |---|---|---|---|---|---|
@@ -19,6 +19,6 @@
 
 Do phases 0–3 before investing in MMO territory or commerce. Every phase ends with an evidence review and a decision-log entry.
 
-## Current campaign gate
+## Current campaign gate (superseded)
 
-The highest-leverage next gate is browser certification of the complete local flow, including reload and a second attack. Until that evidence exists, the playable client is `PARTIAL` even though deterministic simulation and local state transitions are covered by tests. The next implementation priority after certification is live-feeling reinforcement timing plus measured high-DPI and low-end mobile performance.
+This paragraph described an earlier vertical-slice checkpoint. The current work order is in `docs/campaign/full-game/PLAN.md`: continue balance, robustness, and presentation work; then run production browser certification and adversarial review only after the browser-free gates pass. Live reinforcement is implemented; human playtest evidence remains unverified.
