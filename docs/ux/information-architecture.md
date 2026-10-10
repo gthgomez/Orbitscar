@@ -4,9 +4,9 @@
 
 ## Primary navigation
 
-`BASE` · `SECTOR` · `FORCES` · `ALLIANCE`
+Current client navigation is `COLONY` · `TARGETS` · `ARMY`. The sector is a target-selection surface; alliance/crew navigation is deferred.
 
-The four destinations are sufficient for the first release because each maps to a player question: “How is my colony?” “Where is the conflict?” “What can I deploy?” “Who am I coordinating with?” Reports, research, objectives, and cosmetics are contextual destinations, not permanent icon spam.
+The three destinations map to the current player questions: “How is my colony?” “Where can I attack?” and “What can I deploy?” Reports, research, objectives, and the relay map remain contextual. Crew coordination is not part of the current client.
 
 ## Surface map
 
@@ -35,4 +35,4 @@ The four destinations are sufficient for the first release because each maps to 
 3. Cost, risk, and expected consequence.
 4. Long-term progress.
 
-The colony/sector remains visually dominant. Critical text is always paired with a plain-language label; icons are not the sole language. In the current local slice, the primary navigation is represented by Colony, Targets, and Army; Alliance, research, cosmetics, and server-backed reports remain future surfaces.
+The colony/sector remains visually dominant. Critical text is paired with a plain-language label; icons are not the sole language. Colony, Targets, and Army are implemented primary destinations. Contextual research, objectives, battle reports/replays, the relay sector, and a local authority profile switch are implemented. In authority mode, the selected profile owns colony actions and PvE settlement; rival nodes expose versioned defender snapshots and submit the completed deterministic command stream for authoritative settlement. Cosmetics and alliance/crew features remain deferred.

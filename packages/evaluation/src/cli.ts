@@ -18,7 +18,7 @@ const outDir = option("out", join("runs", `eval-${new Date().toISOString().slice
 const content = parseOrbitscarContent(balance);
 const encounters = Object.values(content.encounters);
 const zones: Zone[] = ["west", "north", "south", "east"];
-const plans = [...planDescriptors(encounters, content, zones, [false, true])];
+const plans = [...planDescriptors(encounters, content, zones, [false, true], true)];
 const replicas = Math.max(1, Math.ceil(targetRuns / plans.length));
 
 mkdirSync(outDir, { recursive: true });

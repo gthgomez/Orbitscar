@@ -33,6 +33,15 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.1)(tsx@4.23.13)
 
+  apps/server:
+    dependencies:
+      '@orbitscar/content':
+        specifier: workspace:*
+        version: link:../../packages/content
+      '@orbitscar/simulation':
+        specifier: workspace:*
+        version: link:../../packages/simulation
+
   apps/web:
     dependencies:
       '@orbitscar/content':

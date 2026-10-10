@@ -8,11 +8,12 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:web": "tsc -p apps/web/tsconfig.json --noEmit",
+    "typecheck:server": "tsc -p apps/server/tsconfig.json --noEmit",
     "test": "vitest run",
     "simulate": "tsx packages/simulation/src/cli.ts",
     "validate:content": "tsx packages/content/src/validate.ts",
     "build:web": "pnpm --filter @orbitscar/web build",
-    "check": "pnpm typecheck && pnpm typecheck:web && pnpm validate:content && pnpm test && pnpm build:web",
+    "check": "pnpm typecheck && pnpm typecheck:web && pnpm typecheck:server && pnpm validate:content && pnpm test && pnpm build:web",
     "test:browser": "playwright test",
     "evaluate": "tsx packages/evaluation/src/cli.ts"
   },

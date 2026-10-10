@@ -1,0 +1,14 @@
+{
+  "name": "@orbitscar/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@orbitscar/content": "workspace:*",
+    "@orbitscar/simulation": "workspace:*"
+  }
+}

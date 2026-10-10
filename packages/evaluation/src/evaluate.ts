@@ -1,7 +1,7 @@
 import type { OrbitscarContent, OrbitscarEncounterDefinition } from "@orbitscar/content";
 import { resolveOrbitscarBattle, validateOrbitscarInput, type OrbitscarBattleInput, type OrbitscarBattleResult } from "@orbitscar/simulation";
 import type { Zone } from "./corpus.js";
-import { buildPlanInput, compositionsFor, timings, type PlanDescriptor } from "./corpus.js";
+import { buildPlanInput, compositionsFor, reactiveTiming, timings, type PlanDescriptor } from "./corpus.js";
 
 export type RunRecord = {
   run: number;
@@ -128,11 +128,12 @@ export function summarize(records: RunRecord[]): { groups: EvaluationSummaryGrou
   };
 }
 
-export function* planDescriptors(encounters: OrbitscarEncounterDefinition[], content: OrbitscarContent, zones: Zone[], withAbility: boolean[]): Generator<{ descriptor: PlanDescriptor; build: (seed: number) => ReturnType<typeof buildPlanInput> }> {
+export function* planDescriptors(encounters: OrbitscarEncounterDefinition[], content: OrbitscarContent, zones: Zone[], withAbility: boolean[], includeReactive = false): Generator<{ descriptor: PlanDescriptor; build: (seed: number) => ReturnType<typeof buildPlanInput> }> {
   const compositions = compositionsFor(content);
+  const selectedTimings = includeReactive ? [...timings, reactiveTiming] : timings;
   for (const encounter of encounters)
     for (const composition of compositions)
-      for (const timing of timings)
+      for (const timing of selectedTimings)
         for (const zone of zones)
           for (const ability of withAbility)
             yield { descriptor: { encounterId: encounter.id, compositionId: composition.id, timingId: timing.id, zone, ability }, build: (seed: number) => buildPlanInput(content, encounter, composition, timing, zone, ability, seed) };

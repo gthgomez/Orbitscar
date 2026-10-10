@@ -4,7 +4,7 @@ export const MAX_DEPLOYMENT_CHARGES = 3;
 export type GameMode = "colony" | "targets" | "army" | "deployment" | "battle" | "report";
 export type Zone = "west" | "north" | "south" | "east";
 export type Wave = { zone: Zone; units: OrbitscarArmyEntry[] };
-export type ReplayState = { input: OrbitscarBattleInput; result: OrbitscarBattleResult; attemptId: string; startedAt: number; eventIndex: number; done: boolean };
+export type ReplayState = { kind?: "attack" | "defense"; input: OrbitscarBattleInput; result: OrbitscarBattleResult; attemptId: string; startedAt: number; eventIndex: number; done: boolean; currentTick?: number; archived?: boolean };
 export type AttackPlan = { selectedArmy: Record<string, number>; waveDraft: Record<string, number>; selectedZone: Zone; waves: Wave[]; abilityArmed: boolean };
 export type GameSession = { mode: GameMode; plan: AttackPlan; replay?: ReplayState };
 
@@ -49,6 +49,10 @@ export function startBattle(session: GameSession, replay: ReplayState): GameSess
 
 export function showReport(session: GameSession): GameSession {
   return session.replay?.done ? { ...session, mode: "report" } : session;
+}
+
+export function hasPendingSettlement(session: GameSession): boolean {
+  return session.replay !== undefined && !session.replay.archived;
 }
 
 export function countStaged(waves: readonly Wave[], unitId: string): number {

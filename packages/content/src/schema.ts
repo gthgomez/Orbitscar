@@ -22,6 +22,7 @@ export type OrbitscarTargetPriority =
 
 export type OrbitscarUnitDefinition = {
   id: string;
+  requiredTier: number;
   role: string;
   capacity: number;
   power: number;
@@ -39,6 +40,7 @@ export type OrbitscarResourceBundle = Record<string, number>;
 
 export type OrbitscarBuildingDefinition = {
   id: string;
+  requiredTier: number;
   footprint: [number, number];
   maxHealth: number;
   targetTags: OrbitscarTargetTag[];
@@ -53,13 +55,17 @@ export type OrbitscarDefenseDefinition = {
   range: number;
   damage: number;
   cadence: number;
+  splashRadius: number;
+  splashDamageMultiplier: number;
+  splashTargetTags: OrbitscarTargetTag[];
+  splashWeaknessBonus: boolean;
   targetPriority: OrbitscarTargetPriority[];
   targetTags: OrbitscarTargetTag[];
 };
 
 export type OrbitscarAbilityDefinition = {
   id: string;
-  kind: "reroute";
+  kind: "reroute" | "overcharge";
   durationTicks: number;
   magnitude: number;
 };
@@ -70,15 +76,29 @@ export type OrbitscarCommanderDefinition = {
   charges: number;
 };
 
+export type OrbitscarDoctrineDefinition = {
+  id: string;
+  requiredTier: number;
+  theme: "power" | "logistics" | "breach" | "defense" | "none";
+  description: string;
+  cost: OrbitscarResourceBundle;
+  unitDamageMultiplier: number;
+  bonusDamageVsDefenses: number;
+  trainingCostMultiplier: number;
+  defenseDamageMultiplier: number;
+  defenseHealthMultiplier: number;
+};
+
 export type OrbitscarEncounterDefinition = {
   id: string;
+  requiredTier: number;
+  opponentTier: number;
   name: string;
   codename: string;
   difficulty: "cautious" | "contested" | "severe";
   description: string;
   rewardPreview: OrbitscarResourceBundle;
-  structures: Array<{ id: string; buildingId: string; position: { x: number; y: number }; currentHealth?: number }>;
-  suggestedCounters: string[];
+  structures: Array<{ id: string; buildingId: string; position: { x: number; y: number }; level?: number; currentHealth?: number }>;
 };
 
 export type OrbitscarContent = {
@@ -91,6 +111,7 @@ export type OrbitscarContent = {
   units: Record<string, OrbitscarUnitDefinition>;
   abilities: Record<string, OrbitscarAbilityDefinition>;
   commanders: Record<string, OrbitscarCommanderDefinition>;
+  doctrines: Record<string, OrbitscarDoctrineDefinition>;
   encounters: Record<string, OrbitscarEncounterDefinition>;
 };
 
@@ -194,7 +215,9 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       if (!Array.isArray(footprintValue) || footprintValue.length !== 2) throw new Error(`buildings.${id}.footprint must be [width,height]`);
       const footprint = [integerValue(footprintValue[0], `buildings.${id}.footprint[0]`, 1), integerValue(footprintValue[1], `buildings.${id}.footprint[1]`, 1)] as [number, number];
       const defenseId = item.defenseId === undefined ? undefined : stringValue(item.defenseId, `buildings.${id}.defenseId`);
-      return { id, footprint, maxHealth: finiteNumber(item.maxHealth, `buildings.${id}.maxHealth`, 1), targetTags: tags(item.targetTags, `buildings.${id}.targetTags`), cost: resourceBundle(item.cost, `buildings.${id}.cost`), ...(defenseId === undefined ? {} : { defenseId }) };
+      const requiredTier = integerValue(item.requiredTier ?? 1, `buildings.${id}.requiredTier`, 1);
+      if (requiredTier > 3) throw new Error(`buildings.${id}.requiredTier must be <= 3`);
+      return { id, requiredTier, footprint, maxHealth: finiteNumber(item.maxHealth, `buildings.${id}.maxHealth`, 1), targetTags: tags(item.targetTags, `buildings.${id}.targetTags`), cost: resourceBundle(item.cost, `buildings.${id}.cost`), ...(defenseId === undefined ? {} : { defenseId }) };
     }),
     "buildings",
   );
@@ -203,7 +226,13 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
   const defenses = uniqueIds(
     Object.entries(rawDefenses).map(([id, raw]) => {
       const item = record(raw, `defenses.${id}`);
-      return { id, buildingId: stringValue(item.buildingId, `defenses.${id}.buildingId`), maxHealth: finiteNumber(item.maxHealth, `defenses.${id}.maxHealth`, 1), range: finiteNumber(item.range, `defenses.${id}.range`), damage: finiteNumber(item.damage, `defenses.${id}.damage`), cadence: integerValue(item.cadence, `defenses.${id}.cadence`, 1), targetPriority: priorities(item.targetPriority, `defenses.${id}.targetPriority`), targetTags: tags(item.targetTags, `defenses.${id}.targetTags`) };
+      const splashRadius = item.splashRadius === undefined ? 0 : finiteNumber(item.splashRadius, `defenses.${id}.splashRadius`, 0);
+      const splashDamageMultiplier = item.splashDamageMultiplier === undefined ? 0 : finiteNumber(item.splashDamageMultiplier, `defenses.${id}.splashDamageMultiplier`, 0);
+      const splashTargetTags = item.splashTargetTags === undefined ? [] : tags(item.splashTargetTags, `defenses.${id}.splashTargetTags`);
+      if (item.splashWeaknessBonus !== undefined && typeof item.splashWeaknessBonus !== "boolean") throw new Error(`defenses.${id}.splashWeaknessBonus must be a boolean`);
+      const splashWeaknessBonus = item.splashWeaknessBonus !== false;
+      if (splashDamageMultiplier > 2) throw new Error(`defenses.${id}.splashDamageMultiplier must be <= 2`);
+      return { id, buildingId: stringValue(item.buildingId, `defenses.${id}.buildingId`), maxHealth: finiteNumber(item.maxHealth, `defenses.${id}.maxHealth`, 1), range: finiteNumber(item.range, `defenses.${id}.range`), damage: finiteNumber(item.damage, `defenses.${id}.damage`, 1), cadence: integerValue(item.cadence, `defenses.${id}.cadence`, 1), splashRadius, splashDamageMultiplier, splashTargetTags, splashWeaknessBonus, targetPriority: priorities(item.targetPriority, `defenses.${id}.targetPriority`), targetTags: tags(item.targetTags, `defenses.${id}.targetTags`) };
     }),
     "defenses",
   );
@@ -212,7 +241,9 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
   const units = uniqueIds(
     Object.entries(rawUnits).map(([id, raw]) => {
       const item = record(raw, `units.${id}`);
-      return { id, role: stringValue(item.role, `units.${id}.role`), capacity: integerValue(item.capacity, `units.${id}.capacity`, 1), power: finiteNumber(item.power, `units.${id}.power`, 1), health: finiteNumber(item.health, `units.${id}.health`, 1), range: finiteNumber(item.range, `units.${id}.range`), speed: finiteNumber(item.speed, `units.${id}.speed`, 1), cadence: integerValue(item.cadence, `units.${id}.cadence`, 1), targetPriority: priorities(item.targetPriority, `units.${id}.targetPriority`), targetTags: tags(item.targetTags, `units.${id}.targetTags`), counters: stringArray(item.counters, `units.${id}.counters`), cost: resourceBundle(item.cost, `units.${id}.cost`) };
+      const requiredTier = integerValue(item.requiredTier ?? 1, `units.${id}.requiredTier`, 1);
+      if (requiredTier > 3) throw new Error(`units.${id}.requiredTier must be <= 3`);
+      return { id, requiredTier, role: stringValue(item.role, `units.${id}.role`), capacity: integerValue(item.capacity, `units.${id}.capacity`, 1), power: finiteNumber(item.power, `units.${id}.power`, 1), health: finiteNumber(item.health, `units.${id}.health`, 1), range: finiteNumber(item.range, `units.${id}.range`), speed: finiteNumber(item.speed, `units.${id}.speed`, 1), cadence: integerValue(item.cadence, `units.${id}.cadence`, 1), targetPriority: priorities(item.targetPriority, `units.${id}.targetPriority`), targetTags: tags(item.targetTags, `units.${id}.targetTags`), counters: stringArray(item.counters, `units.${id}.counters`), cost: resourceBundle(item.cost, `units.${id}.cost`) };
     }),
     "units",
   );
@@ -222,8 +253,8 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
     Object.entries(rawAbilities).map(([id, raw]) => {
       const item = record(raw, `abilities.${id}`);
       const kind = stringValue(item.kind, `abilities.${id}.kind`);
-      if (kind !== "reroute") throw new Error(`abilities.${id}.kind '${kind}' is unknown`);
-      return { id, kind: "reroute" as const, durationTicks: integerValue(item.durationTicks, `abilities.${id}.durationTicks`, 1), magnitude: finiteNumber(item.magnitude, `abilities.${id}.magnitude`, 1) };
+      if (kind !== "reroute" && kind !== "overcharge") throw new Error(`abilities.${id}.kind '${kind}' is unknown`);
+      return { id, kind: kind as OrbitscarAbilityDefinition["kind"], durationTicks: integerValue(item.durationTicks, `abilities.${id}.durationTicks`, 1), magnitude: finiteNumber(item.magnitude, `abilities.${id}.magnitude`, 0.01) };
     }),
     "abilities",
   );
@@ -237,11 +268,30 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
     "commanders",
   );
 
+  const rawDoctrines = record(input.doctrines, "doctrines");
+  const doctrines = uniqueIds(Object.entries(rawDoctrines).map(([id, raw]) => {
+    const item = record(raw, `doctrines.${id}`);
+    const theme = stringValue(item.theme, `doctrines.${id}.theme`);
+    if (!["none", "power", "logistics", "breach", "defense"].includes(theme)) throw new Error(`doctrines.${id}.theme is unknown`);
+    const effects = record(item.effects, `doctrines.${id}.effects`);
+    const multipliers = ["unitDamageMultiplier", "bonusDamageVsDefenses", "trainingCostMultiplier", "defenseDamageMultiplier", "defenseHealthMultiplier"] as const;
+    const parsedEffects = Object.fromEntries(multipliers.map((key) => [key, finiteNumber(effects[key], `doctrines.${id}.effects.${key}`, 0.01)])) as Pick<OrbitscarDoctrineDefinition, typeof multipliers[number]>;
+    if (Object.values(parsedEffects).some((value) => value > 2)) throw new Error(`doctrines.${id}.effects multipliers must be <= 2`);
+    const requiredTier = integerValue(item.requiredTier ?? 2, `doctrines.${id}.requiredTier`, 1);
+    if (requiredTier > 3) throw new Error(`doctrines.${id}.requiredTier must be <= 3`);
+    return { id, requiredTier, theme: theme as OrbitscarDoctrineDefinition["theme"], description: stringValue(item.description, `doctrines.${id}.description`), cost: resourceBundle(item.cost, `doctrines.${id}.cost`), ...parsedEffects };
+  }), "doctrines");
+
   for (const building of Object.values(buildings)) {
     if (building.defenseId !== undefined && defenses[building.defenseId] === undefined) throw new Error(`building '${building.id}' references unknown defense '${building.defenseId}'`);
   }
   for (const defense of Object.values(defenses)) {
     if (buildings[defense.buildingId] === undefined) throw new Error(`defense '${defense.id}' references unknown building '${defense.buildingId}'`);
+  }
+  for (const unit of Object.values(units)) {
+    for (const counter of unit.counters) {
+      if (defenses[counter] === undefined) throw new Error(`unit '${unit.id}' references unknown counter '${counter}'`);
+    }
   }
   for (const commander of Object.values(commanders)) {
     if (abilities[commander.abilityId] === undefined) throw new Error(`commander '${commander.id}' references unknown ability '${commander.abilityId}'`);
@@ -258,10 +308,13 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       const structures = rawStructures.map((rawStructure, index) => {
         const structure = record(rawStructure, `encounters.${id}.structures[${index}]`);
         const position = record(structure.position, `encounters.${id}.structures[${index}].position`);
+        const level = structure.level === undefined ? undefined : integerValue(structure.level, `encounters.${id}.structures[${index}].level`, 1);
+        if (level !== undefined && level > 20) throw new Error(`encounters.${id}.structures[${index}].level must be <= 20`);
         const result = {
           id: stringValue(structure.id, `encounters.${id}.structures[${index}].id`),
           buildingId: stringValue(structure.buildingId, `encounters.${id}.structures[${index}].buildingId`),
           position: { x: finiteNumber(position.x, `encounters.${id}.structures[${index}].position.x`), y: finiteNumber(position.y, `encounters.${id}.structures[${index}].position.y`) },
+          ...(level === undefined ? {} : { level }),
           ...(structure.currentHealth === undefined ? {} : { currentHealth: finiteNumber(structure.currentHealth, `encounters.${id}.structures[${index}].currentHealth`) }),
         };
         if (buildings[result.buildingId] === undefined) throw new Error(`encounter '${id}' references unknown building '${result.buildingId}'`);
@@ -269,10 +322,16 @@ export function parseOrbitscarContent(value: unknown): OrbitscarContent {
       });
       const structureIds = structures.map((structure) => structure.id);
       if (new Set(structureIds).size !== structureIds.length) throw new Error(`encounter '${id}' contains duplicate structure IDs`);
-      return { id, name: stringValue(item.name, `encounters.${id}.name`), codename: stringValue(item.codename, `encounters.${id}.codename`), difficulty: difficulty as OrbitscarEncounterDefinition["difficulty"], description: stringValue(item.description, `encounters.${id}.description`), rewardPreview: resourceBundle(item.rewardPreview, `encounters.${id}.rewardPreview`), structures, suggestedCounters: stringArray(item.suggestedCounters, `encounters.${id}.suggestedCounters`) };
+      const requiredTier = integerValue(item.requiredTier ?? 1, `encounters.${id}.requiredTier`, 1);
+      if (requiredTier > 3) throw new Error(`encounters.${id}.requiredTier must be <= 3`);
+      const opponentTier = integerValue(item.opponentTier ?? requiredTier, `encounters.${id}.opponentTier`, 1);
+      if (opponentTier > 3) throw new Error(`encounters.${id}.opponentTier must be <= 3`);
+      if (structures.some((structure) => buildings[structure.buildingId].requiredTier > opponentTier)) throw new Error(`encounters.${id} contains a structure above opponentTier`);
+      return { id, requiredTier, opponentTier, name: stringValue(item.name, `encounters.${id}.name`), codename: stringValue(item.codename, `encounters.${id}.codename`), difficulty: difficulty as OrbitscarEncounterDefinition["difficulty"], description: stringValue(item.description, `encounters.${id}.description`), rewardPreview: resourceBundle(item.rewardPreview, `encounters.${id}.rewardPreview`), structures };
     }),
     "encounters",
   );
 
-  return { schemaVersion, contentSet, rulesetVersion, resources, buildings, defenses, units, abilities, commanders, encounters };
+  if (!doctrines.none || doctrines.none.theme !== "none") throw new Error("doctrines.none is required as the neutral doctrine");
+  return { schemaVersion, contentSet, rulesetVersion, resources, buildings, defenses, units, abilities, commanders, doctrines, encounters };
 }

@@ -12,10 +12,19 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     baseURL: "http://localhost:4173",
   },
-  webServer: {
-    command: "pnpm build:web && pnpm --filter @orbitscar/web exec vite preview --port 4173 --strictPort",
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "pnpm --filter @orbitscar/server dev",
+      url: "http://127.0.0.1:4179/health",
+      env: { ORBITSCAR_PORT: "4179", ORBITSCAR_DATABASE: `./test-results/browser-authority-${process.pid}.json` },
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: "pnpm build:web && pnpm --filter @orbitscar/web exec vite preview --port 4173 --strictPort",
+      port: 4173,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
 });

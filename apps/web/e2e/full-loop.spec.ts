@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { PNG } from "pngjs";
 import { parseOrbitscarContent } from "@orbitscar/content";
-import { authoritativeDigest, createColony } from "@orbitscar/simulation";
-import { act, boot, deployWave, freshColony, metrics, navTo, tapWorld, waitForBattleEnd } from "./helpers.js";
+import { authoritativeDigest, COLONY_SCHEMA_VERSION, createColony, serializeColony } from "@orbitscar/simulation";
+import { storageKey } from "../src/persistence/colony-save.js";
+import { act, boot, deployWave, freshColony, metrics, navTo, tapWorld, waitForBattleEnd, worldToScreen } from "./helpers.js";
 
 const content = parseOrbitscarContent(JSON.parse(readFileSync(new URL("../../../packages/content/data/orbitscar-v0/balance.json", import.meta.url), "utf8")));
 
@@ -21,7 +22,7 @@ test.describe.serial("Orbitscar vertical slice", () => {
   });
 
   async function colonyState(page: Page) {
-    const raw = await page.evaluate(() => localStorage.getItem("orbitscar_colony_v3"));
+    const raw = await page.evaluate((key) => localStorage.getItem(key), storageKey);
     expect(raw, "a colony save exists").toBeTruthy();
     return JSON.parse(raw as string).payload;
   }
@@ -29,20 +30,48 @@ test.describe.serial("Orbitscar vertical slice", () => {
   async function trainAndSave(page: Page): Promise<void> {
     for (let i = 0; i < 9; i++) await act(page, "train:line_rigger");
     for (let i = 0; i < 3; i++) await act(page, "train:pulse_marksman");
+    await act(page, "upgrade:command-relay-1"); // Tier 2 unlocks the air unit used in these battles
     for (let i = 0; i < 2; i++) await act(page, "train:needle_drone");
   }
 
-  test("desktop: colony economy, construction, upgrade, training", async ({ page }) => {
+  test("fresh save gives one clear, real first action", async ({ page }) => {
     await freshColony(page);
+    const sequence = page.locator("section.card").filter({ hasText: "First sortie sequence" });
+    await expect(sequence).toContainText("Install a defense");
+    await expect(page.locator('[data-action="build:command_relay"]')).toHaveCount(0);
+    await expect(page.locator('[data-action="build:matter_extractor"]')).toHaveCount(0);
+    await sequence.locator('[data-action="build:arc_projector"]').click();
+    await tapWorld(page, { x: 620, y: 120 });
+    expect((await colonyState(page)).completedObjectives).toContain("first-defense");
+    await expect(sequence.locator("p strong")).toHaveText("Train three starter units");
+    await expect(sequence).not.toContainText("Scout a relay");
+    for (let i = 0; i < 3; i++) await sequence.locator('[data-action="train:line_rigger"]').click();
+    await expect(sequence.locator("p strong")).toHaveText("Scout a relay");
+    await act(page, "targets");
+    await act(page, "scout:cinder-yard");
+    await expect(page.locator('.nav [data-action="army"]')).toBeEnabled();
+    await navTo(page, "army");
+    await expect(page.locator("h1")).toHaveText("Compose breach force");
+  });
+
+  test("desktop: bounded production, construction, upgrade, training", async ({ page }) => {
+    const accrued = createColony("local-player", content);
+    accrued.productionUpdatedAt = new Date(Date.now() - 3 * 60_000).toISOString();
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(([key, save]) => localStorage.setItem(key as string, save as string), [storageKey, serializeColony(accrued)] as const);
+    await page.reload();
     expect(await metrics(page)).toContain("ALLOY 500");
     await act(page, "collect");
-    expect(await metrics(page)).toContain("ALLOY 530");
-    // construct a second extractor on an open plinth cell via the tactical canvas
-    await act(page, "build:matter_extractor");
+    expect(await metrics(page)).toContain("ALLOY 518");
+    await act(page, "collect");
+    expect(await metrics(page)).toContain("ALLOY 518");
+    // construct an Arc Projector on an open plinth cell; Tier 1 does not allow extractor spam
+    await page.locator('[data-action="build:arc_projector"]').last().click();
     await tapWorld(page, { x: 620, y: 500 });
     const afterBuild = await colonyState(page);
     expect(afterBuild.buildings).toHaveLength(3);
-    expect(afterBuild.resources.alloy).toBeLessThan(530);
+    expect(afterBuild.resources.alloy).toBeLessThan(518);
     // upgrade the original extractor
     await act(page, "upgrade:matter-extractor-1");
     const afterUpgrade = await colonyState(page);
@@ -54,8 +83,36 @@ test.describe.serial("Orbitscar vertical slice", () => {
     expect(trained.reserves).toEqual({ line_rigger: 9, pulse_marksman: 3, needle_drone: 2 });
   });
 
+  test("progression commits a doctrine and home raids report damage against the colony layout", async ({ page }) => {
+    await freshColony(page);
+    for (let i = 0; i < 3; i++) await act(page, "train:line_rigger");
+    await act(page, "upgrade:command-relay-1");
+    await expect(page.locator('[data-action="train:ram_walker"]')).toBeAttached();
+    await act(page, "research:power");
+    await expect(page.locator('[data-action="research:logistics"]')).toBeDisabled();
+    await act(page, "commander:ion_kade");
+    await act(page, "build:scatter_coil");
+    await tapWorld(page, { x: 620, y: 500 });
+    const prepared = await colonyState(page);
+    expect(prepared.doctrineId).toBe("power");
+    expect(prepared.commanderId).toBe("ion_kade");
+    expect(prepared.buildings.some((building: { buildingId: string }) => building.buildingId === "scatter_coil")).toBe(true);
+
+    await act(page, "simulate-raid");
+    await waitForBattleEnd(page);
+    await act(page, "report");
+    await expect(page.locator("h1")).toHaveText("Defense report");
+    await act(page, "return-home");
+    const defended = await colonyState(page);
+    expect(defended.defensiveEngagements).toBe(1);
+    expect(defended.reports[0].kind).toBe("defense");
+    expect(defended.reports[0].input.structures.some((building: { buildingId: string }) => building.buildingId === "scatter_coil")).toBe(true);
+  });
+
   test("deployment capacity: over-capacity force is refused by the client", async ({ page }) => {
     await freshColony(page);
+    for (let i = 0; i < 3; i++) await act(page, "train:line_rigger");
+    await act(page, "upgrade:command-relay-1");
     for (let i = 0; i < 6; i++) await act(page, "train:ram_walker"); // 6 × 4 capacity = 24
     await navTo(page, "targets");
     await act(page, "scout:cinder-yard");
@@ -65,7 +122,62 @@ test.describe.serial("Orbitscar vertical slice", () => {
     expect(await page.locator('[data-action="army:+:ram_walker"]').isDisabled(), "third walker would exceed the 10-capacity budget").toBe(true);
   });
 
-  test("desktop: full breach loop with three waves, ability, report, reconciliation", async ({ page }) => {
+  test("local authority persists PvE territory and settles an asynchronous rival attack", async ({ page }) => {
+    await freshColony(page);
+    // Create the second identity through the local authority, then exercise its
+    // snapshot and attack settlement through the production browser client.
+    const rivalCreated = await page.request.post("/api/profiles", { data: { profileId: "local-rival-drift" } });
+    expect(rivalCreated.ok()).toBe(true);
+    const profileId = `browser-${Date.now().toString(36)}`;
+    await act(page, "authority-panel");
+    await page.locator("#authority-profile-id").fill(profileId);
+    await act(page, "authority-create");
+    await expect(page.locator(".topbar")).toContainText(`Authority · ${profileId}`);
+
+    for (let i = 0; i < 3; i++) await act(page, "train:line_rigger");
+    await act(page, "upgrade:command-relay-1");
+    for (let i = 0; i < 7; i++) await act(page, "train:line_rigger");
+    await navTo(page, "targets");
+    await act(page, "scout:drift-lode");
+    await navTo(page, "army");
+    for (let i = 0; i < 10; i++) await act(page, "army:+:line_rigger");
+    await act(page, "begin-deployment");
+    await deployWave(page, "west", 0);
+    await act(page, "resolve-battle");
+    await waitForBattleEnd(page);
+    await act(page, "report");
+    await act(page, "return-home");
+
+    const pveProfile = await page.request.get(`/api/profiles/${profileId}`);
+    expect(pveProfile.ok()).toBe(true);
+    const pve = await pveProfile.json();
+    expect(pve.colony.sector.securedNodeIds).toContain("drift-lode");
+
+    await navTo(page, "targets");
+    await act(page, "rival:rival-drift");
+    await expect(page.getByLabel("Rival: Drift Exchange layout")).toBeVisible();
+    await navTo(page, "army");
+    for (let i = 0; i < 5; i++) await act(page, "army:+:line_rigger");
+    await act(page, "begin-deployment");
+    await deployWave(page, "north", 0);
+    await act(page, "resolve-battle");
+    await expect(page.locator("h1")).toHaveText("Autonomous breach");
+    await waitForBattleEnd(page);
+    await act(page, "report");
+    await act(page, "return-home");
+
+    const attackerProfile = await page.request.get(`/api/profiles/${profileId}`);
+    const rivalProfile = await page.request.get("/api/profiles/local-rival-drift");
+    expect(attackerProfile.ok()).toBe(true);
+    expect(rivalProfile.ok()).toBe(true);
+    const attacker = await attackerProfile.json();
+    const rival = await rivalProfile.json();
+    expect(attacker.colony.sector.securedRivalNodeIds).toContain("rival-drift");
+    expect(attacker.colony.reports.some((report: { kind: string }) => report.kind === "attack")).toBe(true);
+    expect(rival.colony.reports.some((report: { kind: string }) => report.kind === "defense")).toBe(true);
+  });
+
+  test("desktop: live breach, commander, reinforcements, report, reconciliation", async ({ page }) => {
     await freshColony(page);
     await trainAndSave(page);
     const before = await colonyState(page);
@@ -74,14 +186,17 @@ test.describe.serial("Orbitscar vertical slice", () => {
     await navTo(page, "army");
     for (let i = 0; i < 9; i++) await act(page, "army:+:line_rigger");
     await act(page, "begin-deployment");
-    await deployWave(page, "west", 5); // 4 riggers
-    await deployWave(page, "north", 2); // 3 riggers
-    await deployWave(page, "south", 0); // 2 riggers
-    // deployment charge contract: the fourth wave must be unavailable
-    await expect(page.locator('[data-action="deploy-wave"]')).toBeDisabled();
-    expect(await page.locator("section.content").innerText()).toMatch(/3 \/ 3 waves/i);
-    await act(page, "ability");
+    await deployWave(page, "west", 6); // a three-unit probe leaves two reserves to commit live
     await act(page, "resolve-battle");
+    await expect(page.locator("h1")).toHaveText("Autonomous breach");
+    await act(page, "commander-ability");
+    await act(page, "zone:north");
+    for (let i = 0; i < 3; i++) await act(page, "wave:-:line_rigger");
+    await act(page, "live-reinforce");
+    await act(page, "zone:south");
+    await act(page, "live-reinforce");
+    await expect(page.locator('[data-action="live-reinforce"]')).toBeDisabled();
+    await expect(page.locator("section.content")).toContainText(/reinforcement charges 3\/3/i);
     await waitForBattleEnd(page);
     await act(page, "report");
     expect(await page.locator("section.content").innerText()).toMatch(/attempt attempt-/i);
@@ -90,6 +205,7 @@ test.describe.serial("Orbitscar vertical slice", () => {
     expect(settled.reports).toHaveLength(1);
     expect(settled.reports[0].attemptId).toMatch(/^attempt-/);
     const casualties = settled.reports[0].result.attackerCasualties.line_rigger ?? 0;
+    expect(settled.reports[0].input.commands.map((command: { type: string }) => command.type)).toEqual(["DEPLOY", "COMMANDER_ABILITY", "DEPLOY", "DEPLOY"]);
     expect(settled.reserves).toEqual({
       line_rigger: 9 - casualties,
       pulse_marksman: 3,
@@ -107,9 +223,13 @@ test.describe.serial("Orbitscar vertical slice", () => {
   test("desktop: repeated attacks settle independently under unique attempt ids", async ({ page }) => {
     await freshColony(page);
     for (let i = 0; i < 12; i++) await act(page, "train:line_rigger");
+    let cinderScouted = false;
     const attack = async () => {
       await navTo(page, "targets");
-      await act(page, "scout:cinder-yard");
+      if (!cinderScouted) {
+        await act(page, "scout:cinder-yard");
+        cinderScouted = true;
+      }
       await navTo(page, "army");
       for (let i = 0; i < 9; i++) await act(page, "army:+:line_rigger");
       await act(page, "begin-deployment");
@@ -167,7 +287,7 @@ test.describe.serial("Orbitscar vertical slice", () => {
     // a force that survives long enough for the retreat window to be stable
     for (let i = 0; i < 9; i++) await act(page, "train:line_rigger");
     await navTo(page, "targets");
-    await act(page, "scout:glass-spine");
+    await act(page, "scout:cinder-yard");
     await navTo(page, "army");
     for (let i = 0; i < 9; i++) await act(page, "army:+:line_rigger");
     await act(page, "begin-deployment");
@@ -184,17 +304,16 @@ test.describe.serial("Orbitscar vertical slice", () => {
     expect(state.reports[0].result.loot).toEqual({});
   });
 
-  test("every authored encounter resolves with the commander ability armed", async ({ page }) => {
+  test("both home-frontier encounters can be scouted, fought, and withdrawn from", async ({ page }) => {
     await freshColony(page);
     for (let i = 0; i < 10; i++) await act(page, "train:line_rigger");
-    for (const encounter of ["cinder-yard", "glass-spine", "quiet-orbit"]) {
+    for (const encounter of ["cinder-yard", "drift-lode"]) {
       await navTo(page, "targets");
       await act(page, `scout:${encounter}`);
       await navTo(page, "army");
       for (let i = 0; i < 8; i++) await act(page, "army:+:line_rigger");
       await act(page, "begin-deployment");
       await deployWave(page, "north", 4);
-      await act(page, "ability");
       await act(page, "resolve-battle");
       await page.waitForTimeout(1500);
       await act(page, "retreat");
@@ -203,11 +322,11 @@ test.describe.serial("Orbitscar vertical slice", () => {
       await act(page, "return-home");
     }
     const state = await colonyState(page);
-    expect(state.reports.length).toBeGreaterThanOrEqual(3);
+    expect(state.reports.length).toBeGreaterThanOrEqual(2);
   });
 
   test("persistence: v1 and v2 saves migrate; tampered saves fail safe", async ({ page }) => {
-    // build valid legacy saves with correct digests, node-side
+    // Build valid legacy saves with correct digests, node-side.
     const base = createColony("local-player", content);
     const v1Payload = JSON.parse(JSON.stringify(base));
     delete v1Payload.settings;
@@ -218,26 +337,30 @@ test.describe.serial("Orbitscar vertical slice", () => {
 
     await page.goto("/");
     await page.evaluate(() => localStorage.clear());
-    await page.evaluate(([v1, v2]) => {
-      localStorage.setItem("orbitscar_colony_v1", v1 as string);
-      localStorage.setItem("orbitscar_colony_v2", v2 as string);
-    }, [JSON.stringify(v1), JSON.stringify(v2)] as const);
+    await page.evaluate(([v1]) => localStorage.setItem("orbitscar_colony_v1", v1 as string), [JSON.stringify(v1)] as const);
     await page.reload();
     await expect(page.locator("h1")).toHaveText("Home colony");
-    const migratedInMemory = await page.evaluate(() => JSON.parse(localStorage.getItem("orbitscar_colony_v2") as string).payload);
-    expect(migratedInMemory.resources.alloy, "v2 save wins the fallback chain and loads").toBe(500);
-    // a legacy report gains an attempt id once the migrated colony is saved forward
+    await act(page, "save");
+    expect((await colonyState(page)).schemaVersion).toBe(COLONY_SCHEMA_VERSION);
+
+    await page.evaluate(([v2]) => {
+      localStorage.clear();
+      localStorage.setItem("orbitscar_colony_v2", v2 as string);
+    }, [JSON.stringify(v2)] as const);
+    await page.reload();
+    await expect(page.locator("h1")).toHaveText("Home colony");
+    // A legacy report gains an attempt id once the migrated colony is saved forward.
     await act(page, "save");
     const migrated = await colonyState(page);
     expect(migrated.reports[0].attemptId, "legacy report gains an attempt id").toBe("report-1");
     expect(migrated.reports[0].id).toBe("report-1");
-    expect(migrated.schemaVersion ?? 3).toBe(3);
+    expect(migrated.schemaVersion).toBe(COLONY_SCHEMA_VERSION);
 
     // a save whose payload no longer matches its checksum must fail safe, not crash
     await page.evaluate(([v1]) => {
       const save = JSON.parse(v1 as string);
       save.payload.resources.alloy = 999999;
-      localStorage.setItem("orbitscar_colony_v3", JSON.stringify(save));
+      localStorage.setItem("orbitscar_colony_v5", JSON.stringify(save));
       localStorage.removeItem("orbitscar_colony_v2");
       localStorage.removeItem("orbitscar_colony_v1");
     }, [JSON.stringify(v2)] as const);
@@ -254,13 +377,14 @@ test.describe.serial("Orbitscar vertical slice", () => {
     await freshColony(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "no horizontal overflow").toBeLessThanOrEqual(2);
+    expect(await page.locator(".content").evaluate((element) => getComputedStyle(element).touchAction)).toContain("pan-y");
     for (const action of ["colony", "targets", "army"]) {
       const box = await page.locator(`.nav [data-action="${action}"]`).boundingBox();
       expect(box, `nav ${action} inside viewport`).toBeTruthy();
       expect(box!.y).toBeGreaterThanOrEqual(0);
       expect(box!.y + box!.height).toBeLessThanOrEqual(844);
     }
-    await act(page, "train:line_rigger");
+    for (let i = 0; i < 3; i++) await act(page, "train:line_rigger");
     await navTo(page, "targets");
     await act(page, "scout:cinder-yard");
     await navTo(page, "army");
@@ -277,12 +401,56 @@ test.describe.serial("Orbitscar vertical slice", () => {
     expect(state.reports.length).toBe(1);
   });
 
+  test("keyboard activation and touch input reach native game controls", async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: "http://localhost:4173", viewport: { width: 390, height: 844 }, hasTouch: true });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push("pageerror: " + String(error)));
+    page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("favicon")) errors.push("console: " + message.text()); });
+    try {
+      await page.goto("/");
+      await page.evaluate(() => localStorage.clear());
+      await page.reload();
+      const readability = page.locator('[data-action="toggle-readability"]');
+      await readability.focus();
+      await page.keyboard.press("Enter");
+      await expect(readability).toHaveAttribute("aria-pressed", "true");
+
+      const train = page.locator('[data-action="train:line_rigger"]');
+      await page.locator("details.colony-operations > summary").click();
+      await train.scrollIntoViewIfNeeded();
+      const box = await train.boundingBox();
+      if (!box) throw new Error("line-rigger training control is not visible");
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await expect.poll(async () => (await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), storageKey))?.payload.reserves.line_rigger).toBe(1);
+      await expect(page.locator("details.colony-operations")).toHaveAttribute("open", "");
+      await page.locator('[data-action="build:arc_projector"]').last().click();
+      const canvas = page.locator("canvas");
+      const canvasBox = await canvas.boundingBox();
+      if (!canvasBox) throw new Error("touch placement canvas is not visible");
+      const point = worldToScreen(page.viewportSize() ?? { width: 390, height: 844 }, { x: 620, y: 120 });
+      await page.touchscreen.tap(canvasBox.x + point.x, canvasBox.y + point.y);
+      const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), storageKey);
+      expect(saved?.payload.reserves.line_rigger).toBe(1);
+      expect(saved?.payload.buildings.some((building: { buildingId: string }) => building.buildingId === "arc_projector")).toBe(true);
+      const contentTouchAction = await page.locator(".content").evaluate((element) => getComputedStyle(element).touchAction);
+      expect(contentTouchAction).toContain("pan-x");
+      expect(contentTouchAction).toContain("pan-y");
+      expect(errors).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("low-effects readability preference persists and preserves battle completion", async ({ page }) => {
     await freshColony(page);
     await act(page, "toggle-readability");
+    await act(page, "toggle-audio");
     expect((await colonyState(page)).settings.reducedMotion, "preference persisted to the colony save").toBe(true);
+    expect((await colonyState(page)).settings.muted, "mute preference persisted to the colony save").toBe(true);
     await page.reload();
-    expect(await page.locator(".readability-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect(await page.locator('[data-action="toggle-readability"]').getAttribute("aria-pressed")).toBe("true");
+    expect(await page.locator('[data-action="toggle-audio"]').getAttribute("aria-pressed")).toBe("true");
     expect((await page.locator(".shell").getAttribute("class")) ?? "").toContain("low-effects");
     // a full battle still resolves with calmer updates; no gameplay information is lost
     for (let i = 0; i < 9; i++) await act(page, "train:line_rigger");

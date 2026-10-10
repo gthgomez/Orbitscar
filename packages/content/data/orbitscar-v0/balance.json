@@ -1,92 +1,1307 @@
 {
   "schemaVersion": 1,
   "contentSet": "orbitscar-v0",
-  "rulesetVersion": "0.2.0",
+  "rulesetVersion": "0.10.0",
   "resources": {
-    "alloy": { "kind": "normal" },
-    "volatile": { "kind": "normal" },
-    "signal": { "kind": "normal" }
+    "alloy": {
+      "kind": "normal"
+    },
+    "volatile": {
+      "kind": "normal"
+    },
+    "signal": {
+      "kind": "normal"
+    }
   },
   "buildings": {
-    "command_relay": { "footprint": [3, 3], "maxHealth": 220, "targetTags": ["core"], "cost": { "alloy": 120, "volatile": 40, "signal": 20 } },
-    "matter_extractor": { "footprint": [2, 2], "maxHealth": 95, "targetTags": ["economy", "resource"], "cost": { "alloy": 50, "volatile": 10, "signal": 5 } },
-    "drop_cradle": { "footprint": [2, 2], "maxHealth": 110, "targetTags": ["utility", "deployment"], "cost": { "alloy": 70, "volatile": 20, "signal": 15 } },
-    "arc_projector": { "footprint": [2, 2], "maxHealth": 70, "targetTags": ["defense", "anti_armor"], "defenseId": "arc_projector", "cost": { "alloy": 80, "volatile": 35, "signal": 10 } },
-    "scatter_coil": { "footprint": [1, 1], "maxHealth": 52, "targetTags": ["defense", "anti_swarm"], "defenseId": "scatter_coil", "cost": { "alloy": 45, "volatile": 20, "signal": 8 } },
-    "snare_lattice": { "footprint": [2, 1], "maxHealth": 58, "targetTags": ["defense", "control"], "defenseId": "snare_lattice", "cost": { "alloy": 55, "volatile": 25, "signal": 20 } }
+    "command_relay": {
+      "footprint": [
+        3,
+        3
+      ],
+      "maxHealth": 220,
+      "targetTags": [
+        "core"
+      ],
+      "cost": {
+        "alloy": 120,
+        "volatile": 40,
+        "signal": 20
+      }
+    },
+    "matter_extractor": {
+      "footprint": [
+        2,
+        2
+      ],
+      "maxHealth": 95,
+      "targetTags": [
+        "economy",
+        "resource"
+      ],
+      "cost": {
+        "alloy": 50,
+        "volatile": 10,
+        "signal": 5
+      }
+    },
+    "drop_cradle": {
+      "footprint": [
+        2,
+        2
+      ],
+      "maxHealth": 110,
+      "targetTags": [
+        "utility",
+        "deployment"
+      ],
+      "cost": {
+        "alloy": 70,
+        "volatile": 20,
+        "signal": 15
+      }
+    },
+    "arc_projector": {
+      "footprint": [
+        2,
+        2
+      ],
+      "maxHealth": 70,
+      "targetTags": [
+        "defense",
+        "anti_armor"
+      ],
+      "defenseId": "arc_projector",
+      "cost": {
+        "alloy": 80,
+        "volatile": 35,
+        "signal": 10
+      }
+    },
+    "scatter_coil": {
+      "requiredTier": 2,
+      "footprint": [
+        1,
+        1
+      ],
+      "maxHealth": 52,
+      "targetTags": [
+        "defense",
+        "anti_swarm"
+      ],
+      "defenseId": "scatter_coil",
+      "cost": {
+        "alloy": 45,
+        "volatile": 20,
+        "signal": 8
+      }
+    },
+    "snare_lattice": {
+      "requiredTier": 2,
+      "footprint": [
+        2,
+        1
+      ],
+      "maxHealth": 58,
+      "targetTags": [
+        "defense",
+        "control"
+      ],
+      "defenseId": "snare_lattice",
+      "cost": {
+        "alloy": 55,
+        "volatile": 25,
+        "signal": 20
+      }
+    }
   },
   "defenses": {
-    "arc_projector": { "buildingId": "arc_projector", "maxHealth": 70, "range": 260, "damage": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "ground" }, { "selector": "any" }], "targetTags": ["defense", "anti_armor"] },
-    "scatter_coil": { "buildingId": "scatter_coil", "maxHealth": 52, "range": 190, "damage": 3, "cadence": 12, "targetPriority": [{ "selector": "tag", "tag": "ground" }, { "selector": "any" }], "targetTags": ["defense", "anti_swarm"] },
-    "snare_lattice": { "buildingId": "snare_lattice", "maxHealth": 58, "range": 220, "damage": 2, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "air" }, { "selector": "any" }], "targetTags": ["defense", "control"] }
+    "arc_projector": {
+      "buildingId": "arc_projector",
+      "maxHealth": 70,
+      "range": 260,
+      "damage": 5,
+      "cadence": 24,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "ground"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "defense",
+        "anti_armor"
+      ]
+    },
+    "scatter_coil": {
+      "buildingId": "scatter_coil",
+      "maxHealth": 52,
+      "range": 190,
+      "damage": 3,
+      "cadence": 18,
+      "splashRadius": 90,
+      "splashDamageMultiplier": 0.75,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "ground"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "defense",
+        "anti_swarm"
+      ]
+    },
+    "snare_lattice": {
+      "buildingId": "snare_lattice",
+      "maxHealth": 58,
+      "range": 220,
+      "damage": 2,
+      "cadence": 18,
+      "splashRadius": 70,
+      "splashDamageMultiplier": 0.5,
+      "splashTargetTags": ["air"],
+      "splashWeaknessBonus": false,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "air"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "defense",
+        "control"
+      ]
+    }
   },
   "units": {
-    "line_rigger": { "role": "screen", "capacity": 1, "power": 5, "health": 34, "range": 34, "speed": 5, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"], "cost": { "alloy": 8, "volatile": 2, "signal": 1 } },
-    "pulse_marksman": { "role": "ranged_utility", "capacity": 1, "power": 4, "health": 24, "range": 150, "speed": 3, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 10, "volatile": 3, "signal": 4 } },
-    "breach_medic": { "role": "support", "capacity": 2, "power": 2, "health": 28, "range": 80, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "lowest_health", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["snare_lattice"], "cost": { "alloy": 12, "volatile": 4, "signal": 6 } },
-    "signal_saboteur": { "role": "disable", "capacity": 2, "power": 3, "health": 22, "range": 110, "speed": 4, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "utility" }], "targetTags": ["ground"], "counters": ["snare_lattice"], "cost": { "alloy": 14, "volatile": 5, "signal": 8 } },
-    "ram_walker": { "role": "anti_structure", "capacity": 4, "power": 8, "health": 70, "range": 42, "speed": 2, "cadence": 30, "targetPriority": [{ "selector": "tag", "tag": "defense" }, { "selector": "tag", "tag": "core" }], "targetTags": ["ground", "anti_armor"], "counters": ["snare_lattice"], "cost": { "alloy": 24, "volatile": 10, "signal": 3 } },
-    "skirmish_walker": { "role": "flank", "capacity": 3, "power": 4, "health": 30, "range": 48, "speed": 6, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 16, "volatile": 6, "signal": 3 } },
-    "shield_carrier": { "role": "cover", "capacity": 3, "power": 2, "health": 90, "range": 34, "speed": 2, "cadence": 30, "targetPriority": [{ "selector": "nearest", "tag": "defense" }, { "selector": "any" }], "targetTags": ["ground"], "counters": ["scatter_coil"], "cost": { "alloy": 20, "volatile": 5, "signal": 2 } },
-    "salvage_hauler": { "role": "extract", "capacity": 2, "power": 2, "health": 42, "range": 60, "speed": 3, "cadence": 30, "targetPriority": [{ "selector": "tag", "tag": "resource" }, { "selector": "tag", "tag": "economy" }], "targetTags": ["ground"], "counters": ["arc_projector"], "cost": { "alloy": 13, "volatile": 5, "signal": 4 } },
-    "needle_drone": { "role": "air_harass", "capacity": 1, "power": 5, "health": 18, "range": 120, "speed": 7, "cadence": 18, "targetPriority": [{ "selector": "tag", "tag": "air" }, { "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["snare_lattice"], "cost": { "alloy": 9, "volatile": 5, "signal": 5 } },
-    "relay_drone": { "role": "reinforcement_anchor", "capacity": 2, "power": 3, "health": 26, "range": 90, "speed": 5, "cadence": 24, "targetPriority": [{ "selector": "tag", "tag": "utility" }, { "selector": "any" }], "targetTags": ["air"], "counters": ["scatter_coil"], "cost": { "alloy": 11, "volatile": 4, "signal": 7 } }
+    "line_rigger": {
+      "role": "screen",
+      "capacity": 1,
+      "power": 3.75,
+      "health": 30,
+      "range": 34,
+      "speed": 5,
+      "cadence": 18,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "defense"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "scatter_coil"
+      ],
+      "cost": {
+        "alloy": 8,
+        "volatile": 2,
+        "signal": 1
+      }
+    },
+    "pulse_marksman": {
+      "role": "ranged_utility",
+      "capacity": 1,
+      "power": 4,
+      "health": 24,
+      "range": 150,
+      "speed": 3,
+      "cadence": 24,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "utility"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "arc_projector"
+      ],
+      "cost": {
+        "alloy": 10,
+        "volatile": 3,
+        "signal": 4
+      }
+    },
+    "breach_medic": {
+      "requiredTier": 2,
+      "role": "support",
+      "capacity": 2,
+      "power": 2,
+      "health": 28,
+      "range": 80,
+      "speed": 3,
+      "cadence": 30,
+      "targetPriority": [
+        {
+          "selector": "lowest_health",
+          "tag": "defense"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "snare_lattice"
+      ],
+      "cost": {
+        "alloy": 12,
+        "volatile": 4,
+        "signal": 6
+      }
+    },
+    "signal_saboteur": {
+      "requiredTier": 2,
+      "role": "disable",
+      "capacity": 2,
+      "power": 3,
+      "health": 22,
+      "range": 110,
+      "speed": 4,
+      "cadence": 24,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "defense"
+        },
+        {
+          "selector": "tag",
+          "tag": "utility"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "snare_lattice"
+      ],
+      "cost": {
+        "alloy": 14,
+        "volatile": 5,
+        "signal": 8
+      }
+    },
+    "ram_walker": {
+      "requiredTier": 2,
+      "role": "anti_structure",
+      "capacity": 4,
+      "power": 8,
+      "health": 70,
+      "range": 42,
+      "speed": 2,
+      "cadence": 30,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "defense"
+        },
+        {
+          "selector": "tag",
+          "tag": "core"
+        }
+      ],
+      "targetTags": [
+        "ground",
+        "anti_armor"
+      ],
+      "counters": [
+        "snare_lattice"
+      ],
+      "cost": {
+        "alloy": 24,
+        "volatile": 10,
+        "signal": 3
+      }
+    },
+    "skirmish_walker": {
+      "requiredTier": 2,
+      "role": "flank",
+      "capacity": 3,
+      "power": 4,
+      "health": 30,
+      "range": 48,
+      "speed": 6,
+      "cadence": 18,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "utility"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "arc_projector"
+      ],
+      "cost": {
+        "alloy": 16,
+        "volatile": 6,
+        "signal": 3
+      }
+    },
+    "shield_carrier": {
+      "requiredTier": 2,
+      "role": "cover",
+      "capacity": 3,
+      "power": 2,
+      "health": 90,
+      "range": 34,
+      "speed": 2,
+      "cadence": 30,
+      "targetPriority": [
+        {
+          "selector": "nearest",
+          "tag": "defense"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "scatter_coil"
+      ],
+      "cost": {
+        "alloy": 20,
+        "volatile": 5,
+        "signal": 2
+      }
+    },
+    "salvage_hauler": {
+      "role": "extract",
+      "capacity": 2,
+      "power": 2,
+      "health": 42,
+      "range": 60,
+      "speed": 3,
+      "cadence": 30,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "resource"
+        },
+        {
+          "selector": "tag",
+          "tag": "economy"
+        }
+      ],
+      "targetTags": [
+        "ground"
+      ],
+      "counters": [
+        "arc_projector"
+      ],
+      "cost": {
+        "alloy": 13,
+        "volatile": 5,
+        "signal": 4
+      }
+    },
+    "needle_drone": {
+      "requiredTier": 2,
+      "role": "air_harass",
+      "capacity": 1,
+      "power": 5,
+      "health": 18,
+      "range": 120,
+      "speed": 7,
+      "cadence": 18,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "air"
+        },
+        {
+          "selector": "tag",
+          "tag": "utility"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "air"
+      ],
+      "counters": [
+        "snare_lattice"
+      ],
+      "cost": {
+        "alloy": 9,
+        "volatile": 5,
+        "signal": 5
+      }
+    },
+    "relay_drone": {
+      "requiredTier": 3,
+      "role": "reinforcement_anchor",
+      "capacity": 2,
+      "power": 3,
+      "health": 26,
+      "range": 90,
+      "speed": 5,
+      "cadence": 24,
+      "targetPriority": [
+        {
+          "selector": "tag",
+          "tag": "utility"
+        },
+        {
+          "selector": "any"
+        }
+      ],
+      "targetTags": [
+        "air"
+      ],
+      "counters": [
+        "scatter_coil"
+      ],
+      "cost": {
+        "alloy": 11,
+        "volatile": 4,
+        "signal": 7
+      }
+    }
   },
   "abilities": {
-    "emergency_reroute": { "kind": "reroute", "durationTicks": 180, "magnitude": 2 }
+    "emergency_reroute": {
+      "kind": "reroute",
+      "durationTicks": 180,
+      "magnitude": 2
+    },
+    "weapon_overcharge": {
+      "kind": "overcharge",
+      "durationTicks": 180,
+      "magnitude": 0.5
+    }
   },
   "commanders": {
-    "mara_voss": { "abilityId": "emergency_reroute", "charges": 1 },
-    "ion_kade": { "abilityId": "emergency_reroute", "charges": 1 }
+    "mara_voss": {
+      "abilityId": "emergency_reroute",
+      "charges": 1
+    },
+    "ion_kade": {
+      "abilityId": "weapon_overcharge",
+      "charges": 1
+    }
+  },
+  "doctrines": {
+    "none": {
+      "requiredTier": 1,
+      "theme": "none",
+      "description": "No permanent combat specialization.",
+      "cost": {},
+      "effects": {
+        "unitDamageMultiplier": 1,
+        "bonusDamageVsDefenses": 1,
+        "trainingCostMultiplier": 1,
+        "defenseDamageMultiplier": 1,
+        "defenseHealthMultiplier": 1
+      }
+    },
+    "power": {
+      "requiredTier": 2,
+      "theme": "power",
+      "description": "Increase every deployed unit's damage by 12%.",
+      "cost": {
+        "alloy": 160,
+        "volatile": 70,
+        "signal": 45
+      },
+      "effects": {
+        "unitDamageMultiplier": 1.12,
+        "bonusDamageVsDefenses": 1,
+        "trainingCostMultiplier": 1,
+        "defenseDamageMultiplier": 1,
+        "defenseHealthMultiplier": 1
+      }
+    },
+    "logistics": {
+      "requiredTier": 2,
+      "theme": "logistics",
+      "description": "Reduce unit training costs by 20%.",
+      "cost": {
+        "alloy": 160,
+        "volatile": 70,
+        "signal": 45
+      },
+      "effects": {
+        "unitDamageMultiplier": 1,
+        "bonusDamageVsDefenses": 1,
+        "trainingCostMultiplier": 0.8,
+        "defenseDamageMultiplier": 1,
+        "defenseHealthMultiplier": 1
+      }
+    },
+    "breach": {
+      "requiredTier": 2,
+      "theme": "breach",
+      "description": "Deal 25% more damage to hostile defenses.",
+      "cost": {
+        "alloy": 160,
+        "volatile": 70,
+        "signal": 45
+      },
+      "effects": {
+        "unitDamageMultiplier": 1,
+        "bonusDamageVsDefenses": 1.25,
+        "trainingCostMultiplier": 1,
+        "defenseDamageMultiplier": 1,
+        "defenseHealthMultiplier": 1
+      }
+    },
+    "defense": {
+      "requiredTier": 2,
+      "theme": "defense",
+      "description": "Colony defenses deal 20% more damage and structures gain 15% integrity during raids.",
+      "cost": {
+        "alloy": 160,
+        "volatile": 70,
+        "signal": 45
+      },
+      "effects": {
+        "unitDamageMultiplier": 1,
+        "bonusDamageVsDefenses": 1,
+        "trainingCostMultiplier": 1,
+        "defenseDamageMultiplier": 1.2,
+        "defenseHealthMultiplier": 1.15
+      }
+    }
   },
   "encounters": {
     "cinder-yard": {
+      "opponentTier": 2,
       "name": "Cinder Yard Relay",
       "codename": "CINDER-07",
       "difficulty": "cautious",
       "description": "A lightly defended salvage relay with a generous exposed extractor. A clean first breach for testing approach angles.",
-      "rewardPreview": { "alloy": 36, "volatile": 14, "signal": 6 },
-      "suggestedCounters": ["line_rigger", "pulse_marksman", "ram_walker"],
+      "rewardPreview": {
+        "alloy": 36,
+        "volatile": 14,
+        "signal": 6
+      },
       "structures": [
-        { "id": "relay", "buildingId": "command_relay", "position": { "x": 930, "y": 400 } },
-        { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 240 } },
-        { "id": "cradle", "buildingId": "drop_cradle", "position": { "x": 760, "y": 560 } },
-        { "id": "arc", "buildingId": "arc_projector", "position": { "x": 640, "y": 300 } },
-        { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 690, "y": 520 } },
-        { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 830, "y": 400 } }
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 150,
+            "y": 400
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 360,
+            "y": 240
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 360,
+            "y": 560
+          }
+        },
+        {
+          "id": "arc",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 480,
+            "y": 300
+          }
+        },
+        {
+          "id": "scatter",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 470,
+            "y": 520
+          }
+        }
       ]
     },
     "glass-spine": {
+      "requiredTier": 2,
+      "opponentTier": 2,
       "name": "Glass Spine Foundry",
       "codename": "GLASS-22",
       "difficulty": "contested",
-      "description": "A compact foundry ring with overlapping fire lanes. The north approach is shorter; the south route gives ranged units more breathing room.",
-      "rewardPreview": { "alloy": 54, "volatile": 20, "signal": 10 },
-      "suggestedCounters": ["pulse_marksman", "signal_saboteur", "needle_drone"],
+      "description": "A compact foundry ring places its resource stores behind two intersecting defense arcs. Scout the lanes to choose how much firing range to trade for a shorter route.",
+      "rewardPreview": {
+        "alloy": 54,
+        "volatile": 20,
+        "signal": 10
+      },
       "structures": [
-        { "id": "relay", "buildingId": "command_relay", "position": { "x": 920, "y": 400 } },
-        { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 205 } },
-        { "id": "extractor-2", "buildingId": "matter_extractor", "position": { "x": 760, "y": 595 } },
-        { "id": "arc", "buildingId": "arc_projector", "position": { "x": 620, "y": 280 } },
-        { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 710, "y": 470 } },
-        { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 825, "y": 400 } }
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 920,
+            "y": 280
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 760,
+            "y": 515
+          }
+        },
+        {
+          "id": "extractor-2",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 760,
+            "y": 125
+          }
+        },
+        {
+          "id": "arc",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 620,
+            "y": 440
+          }
+        },
+        {
+          "id": "scatter",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 710,
+            "y": 290
+          }
+        },
+        {
+          "id": "scatter-2",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 740,
+            "y": 430
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 825,
+            "y": 360
+          }
+        }
       ]
     },
     "quiet-orbit": {
+      "requiredTier": 3,
+      "opponentTier": 3,
       "name": "Quiet Orbit Depot",
       "codename": "QUIET-31",
       "difficulty": "severe",
       "description": "A mature depot protected by a layered defense mesh. It pays well, but careless mass deployment feeds the scatter coil.",
-      "rewardPreview": { "alloy": 72, "volatile": 28, "signal": 15 },
-      "suggestedCounters": ["shield_carrier", "breach_medic", "ram_walker"],
+      "rewardPreview": {
+        "alloy": 72,
+        "volatile": 28,
+        "signal": 15
+      },
       "structures": [
-        { "id": "relay", "buildingId": "command_relay", "position": { "x": 930, "y": 400 } },
-        { "id": "extractor", "buildingId": "matter_extractor", "position": { "x": 760, "y": 210 } },
-        { "id": "extractor-2", "buildingId": "matter_extractor", "position": { "x": 760, "y": 590 } },
-        { "id": "cradle", "buildingId": "drop_cradle", "position": { "x": 790, "y": 400 } },
-        { "id": "arc", "buildingId": "arc_projector", "position": { "x": 610, "y": 260 } },
-        { "id": "scatter", "buildingId": "scatter_coil", "position": { "x": 675, "y": 500 } },
-        { "id": "snare", "buildingId": "snare_lattice", "position": { "x": 835, "y": 400 } }
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 150,
+            "y": 400
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 360,
+            "y": 210
+          }
+        },
+        {
+          "id": "extractor-2",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 360,
+            "y": 590
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 410,
+            "y": 400
+          }
+        },
+        {
+          "id": "arc",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 510,
+            "y": 260
+          }
+        },
+        {
+          "id": "scatter",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 485,
+            "y": 500
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 285,
+            "y": 400
+          }
+        }
+      ]
+    },
+    "drift-lode": {
+      "requiredTier": 1,
+      "opponentTier": 1,
+      "name": "Drift Lode Cache",
+      "codename": "DRIFT-04",
+      "difficulty": "cautious",
+      "description": "A quiet extraction cache with two separated resource nodes and no installed weapons. Choose whether to secure the whole cache or finish the core quickly.",
+      "rewardPreview": {
+        "alloy": 30,
+        "volatile": 12,
+        "signal": 7
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 900,
+            "y": 360
+          }
+        },
+        {
+          "id": "upper-extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 760,
+            "y": 200
+          }
+        },
+        {
+          "id": "lower-extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 760,
+            "y": 600
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 560,
+            "y": 360
+          }
+        }
+      ]
+    },
+    "glasswake-gate": {
+      "requiredTier": 1,
+      "opponentTier": 2,
+      "name": "Glasswake Gate",
+      "codename": "WAKE-11",
+      "difficulty": "contested",
+      "description": "The projector controls the middle approach while a scatter coil and air snare guard the relay-side lanes. Scout their firing arcs and choose an entry that exposes the force to one weapon at a time.",
+      "rewardPreview": {
+        "alloy": 38,
+        "volatile": 16,
+        "signal": 8
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 900,
+            "y": 320
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 780,
+            "y": 520
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 760,
+            "y": 120
+          }
+        },
+        {
+          "id": "projector",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 620,
+            "y": 400
+          }
+        },
+        {
+          "id": "coil",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 700,
+            "y": 260
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 820,
+            "y": 340
+          }
+        }
+      ]
+    },
+    "ember-switch": {
+      "requiredTier": 2,
+      "opponentTier": 2,
+      "name": "Ember Switchyard",
+      "codename": "EMBER-16",
+      "difficulty": "contested",
+      "description": "A coil covers the lower service lane while a projector watches the center. The northern route is shorter; the lower route exposes the coil early.",
+      "rewardPreview": {
+        "alloy": 50,
+        "volatile": 19,
+        "signal": 10
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 180,
+            "y": 360
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 320,
+            "y": 200
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 320,
+            "y": 600
+          }
+        },
+        {
+          "id": "projector",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 500,
+            "y": 320
+          }
+        },
+        {
+          "id": "coil",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 510,
+            "y": 500
+          }
+        }
+      ]
+    },
+    "salt-spool": {
+      "requiredTier": 2,
+      "opponentTier": 2,
+      "name": "Salt Spool Relay",
+      "codename": "SALT-19",
+      "difficulty": "contested",
+      "description": "An air snare guards the center of a split utility yard. Ground units can use either outer lane; air units need a deliberate reinforcement or commander window.",
+      "rewardPreview": {
+        "alloy": 54,
+        "volatile": 21,
+        "signal": 11
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 900,
+            "y": 320
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 780,
+            "y": 520
+          }
+        },
+        {
+          "id": "cradle-a",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 560,
+            "y": 360
+          }
+        },
+        {
+          "id": "cradle-b",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 760,
+            "y": 120
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 820,
+            "y": 340
+          }
+        },
+        {
+          "id": "coil",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 700,
+            "y": 240
+          }
+        }
+      ]
+    },
+    "shard-cairn": {
+      "requiredTier": 2,
+      "opponentTier": 2,
+      "name": "Shard Cairn Foundry",
+      "codename": "SHARD-23",
+      "difficulty": "severe",
+      "description": "A split resource ring sits behind a coil and a lattice. The core-side gap is narrow, so scouts should compare the north and south approach before committing armor.",
+      "rewardPreview": {
+        "alloy": 62,
+        "volatile": 24,
+        "signal": 12
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 180,
+            "y": 360
+          }
+        },
+        {
+          "id": "upper-extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 340,
+            "y": 200
+          }
+        },
+        {
+          "id": "lower-extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 340,
+            "y": 600
+          }
+        },
+        {
+          "id": "projector",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 520,
+            "y": 280
+          }
+        },
+        {
+          "id": "projector-a",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 420,
+            "y": 360
+          }
+        },
+        {
+          "id": "coil",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 540,
+            "y": 500
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 320,
+            "y": 400
+          }
+        }
+      ]
+    },
+    "morrow-gate": {
+      "requiredTier": 2,
+      "opponentTier": 2,
+      "name": "Morrow Gate Array",
+      "codename": "MORROW-27",
+      "difficulty": "severe",
+      "description": "Two projectors cover opposing lanes around a central air lattice. A front-loaded force can draw both weapons; hold a reserve to enter after the defenders commit to one side.",
+      "rewardPreview": {
+        "alloy": 66,
+        "volatile": 26,
+        "signal": 13
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 900,
+            "y": 280
+          }
+        },
+        {
+          "id": "extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 820,
+            "y": 520
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 820,
+            "y": 120
+          }
+        },
+        {
+          "id": "projector-a",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 680,
+            "y": 460
+          }
+        },
+        {
+          "id": "projector-b",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 680,
+            "y": 220
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 820,
+            "y": 340
+          }
+        }
+      ]
+    },
+    "vesper-vault": {
+      "requiredTier": 3,
+      "opponentTier": 3,
+      "name": "Vesper Vault Depot",
+      "codename": "VESPER-34",
+      "difficulty": "severe",
+      "description": "A mature depot layers one long-range gun, a close scatter coil, and an air snare around two distant stores. Choose which side to breach and whether to commit the second force after the first lane is revealed.",
+      "rewardPreview": {
+        "alloy": 78,
+        "volatile": 31,
+        "signal": 17
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 180,
+            "y": 380
+          }
+        },
+        {
+          "id": "upper-extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 280,
+            "y": 200
+          }
+        },
+        {
+          "id": "lower-extractor",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 280,
+            "y": 600
+          }
+        },
+        {
+          "id": "projector",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 440,
+            "y": 260
+          }
+        },
+        {
+          "id": "coil",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 460,
+            "y": 480
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 320,
+            "y": 400
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 400,
+            "y": 400
+          }
+        }
+      ]
+    },
+    "hollow-meridian": {
+      "requiredTier": 3,
+      "opponentTier": 3,
+      "name": "Hollow Meridian Bastion",
+      "codename": "HOLLOW-39",
+      "difficulty": "severe",
+      "description": "One long-range projector and two scatter coils form a layered defense around an air snare. A central cradle breaks the straight route; scout ranges and target priorities before committing to a lane.",
+      "rewardPreview": {
+        "alloy": 84,
+        "volatile": 34,
+        "signal": 19
+      },
+      "structures": [
+        {
+          "id": "relay",
+          "buildingId": "command_relay",
+          "position": {
+            "x": 900,
+            "y": 320
+          }
+        },
+        {
+          "id": "extractor-a",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 840,
+            "y": 500
+          }
+        },
+        {
+          "id": "extractor-b",
+          "buildingId": "matter_extractor",
+          "position": {
+            "x": 840,
+            "y": 140
+          }
+        },
+        {
+          "id": "projector-a",
+          "buildingId": "arc_projector",
+          "position": {
+            "x": 650,
+            "y": 520
+          }
+        },
+        {
+          "id": "coil-a",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 690,
+            "y": 400
+          }
+        },
+        {
+          "id": "coil-b",
+          "buildingId": "scatter_coil",
+          "position": {
+            "x": 690,
+            "y": 320
+          }
+        },
+        {
+          "id": "snare",
+          "buildingId": "snare_lattice",
+          "position": {
+            "x": 800,
+            "y": 400
+          }
+        },
+        {
+          "id": "cradle",
+          "buildingId": "drop_cradle",
+          "position": {
+            "x": 450,
+            "y": 360
+          }
+        }
       ]
     }
   }
