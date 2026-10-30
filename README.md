@@ -8,6 +8,35 @@ Project Orbitscar is an independent sci-fi strategy prototype, re-implemented se
 
 The working title is provisional and has not received trademark, domain, or store clearance.
 
+## Build a colony. Scout a relay. Commit a breach.
+
+[![Recorded gameplay preview — click to open the full clip](docs/showcase/preview.gif)](docs/showcase/gameplay.mp4)
+
+Watch an AI-operated browser place a defense, train three Line Riggers, scout Cinder Yard, compose a force, and resolve a real opening battle. This attempt ends in defeat: the report preserves the losses and tactical readout for the next plan.
+
+[Open or download the full silent recording](docs/showcase/gameplay.mp4) · [Capture notes and reproduction](docs/showcase/README.md)
+
+<details>
+<summary>Explore four screenshots and feature captions</summary>
+
+**Start a colony.** A fresh solo save and the first sortie checklist.
+
+![Start a colony: A fresh solo save and the first sortie checklist.](docs/showcase/01-colony.png)
+
+**Compose the force.** Three normally trained Line Riggers fill the opening draft.
+
+![Compose the force: Three normally trained Line Riggers fill the opening draft.](docs/showcase/03-force.png)
+
+**Read the battlefield.** The live Phaser canvas layer, captured without the overlaid DOM command panel.
+
+![Read the battlefield: The live Phaser canvas layer, captured without the overlaid DOM command panel.](docs/showcase/04-breach-renderer.png)
+
+**Learn from the result.** The actual defeat report: three deployed, three casualties, no salvage.
+
+![Learn from the result: The actual defeat report: three deployed, three casualties, no salvage.](docs/showcase/05-report.png)
+
+</details>
+
 ## Current boundary
 
 - `packages/simulation/` — deterministic, headless battle and persistent-colony rules.

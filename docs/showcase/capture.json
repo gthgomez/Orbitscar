@@ -1,0 +1,20 @@
+{
+  "revision": "3f1bf3fef60f961d192ad42b92c142d08715850e",
+  "capturedAt": "2026-10-30T12:09:51.007Z",
+  "browser": "154.0.8037.57",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "pageErrors": [],
+  "fixture": "Fresh solo local save; Cinder Yard opening sortie; Phaser Canvas fallback (--disable-webgl); no authority profile, save injection or debug progression",
+  "verified": [
+    "home rendered",
+    "defense placed through canvas",
+    "three Line Riggers trained",
+    "target scouted",
+    "army composed",
+    "live battle resolved",
+    "report opened"
+  ]
+}
